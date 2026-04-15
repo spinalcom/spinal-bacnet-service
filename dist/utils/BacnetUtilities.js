@@ -70,12 +70,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BacnetUtilities = void 0;
 const lodash = __importStar(require("lodash"));
-//@ts-ignore
-const bacnet = __importStar(require("bacstack"));
+const bacstack_1 = __importDefault(require("bacstack"));
 const GlobalVariables_1 = require("./GlobalVariables");
 const GlobalVariables_2 = require("./GlobalVariables");
 const node_events_1 = __importDefault(require("node:events"));
-const constants_1 = require("../constants");
+const constants_1 = require("./constants");
 class BacnetUtilitiesClass extends node_events_1.default {
     constructor() {
         super();
@@ -92,7 +91,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
         return this.instance;
     }
     createNewBacnetClient() {
-        const client = new bacnet({ adpuTimeout: 10000 });
+        const client = new bacstack_1.default();
         this._listenClientErrorEvent(client);
         return client;
     }
@@ -118,6 +117,14 @@ class BacnetUtilitiesClass extends node_events_1.default {
         }
     }
     _listenClientErrorEvent(client) {
+        client.on('close', () => {
+            console.log("client closed");
+            // this._client = null;
+        });
+        client.on('timeout', () => {
+            console.log("client timeout");
+            // this._client = null;
+        });
         client.on('error', () => {
             console.log("error client");
             // this._client = null;
@@ -187,17 +194,18 @@ class BacnetUtilitiesClass extends node_events_1.default {
                     values = lodash.flattenDeep(dataFormatted);
                 }
                 else {
-                    const params = [objectId, GlobalVariables_1.PropertyIds.PROP_OBJECT_LIST];
-                    let data = yield this.readProperty(deviceAddress, device.SADR, params[0], params[1]);
+                    let data = yield this.readProperty(deviceAddress, device.SADR, objectId, GlobalVariables_1.PropertyIds.PROP_OBJECT_LIST);
                     values = data.values;
                 }
             }
             catch (error) {
+                // error reason:4 means that the device does not support segmentation or the response is too big, so we can retry with fragment method
                 if (error.message.match(/reason:4/i) || error.message.match(/err_timeout/i))
                     values = yield this.getItemListByFragment(device, objectId);
             }
+            // If values is still undefined or empty after trying both methods, throw an error
             if (typeof values === "undefined" || !(values === null || values === void 0 ? void 0 : values.length))
-                throw "No values found";
+                throw new Error("No values found");
             return values.filter((item) => SENSOR_TYPES.indexOf(item.value.type) !== -1);
         });
     }
@@ -251,7 +259,6 @@ class BacnetUtilitiesClass extends node_events_1.default {
                         objectListDetails.push(res);
                     }
                     catch (err) {
-                        console.error(err);
                         if (deviceAcceptSegmentation) {
                             const itemsFound = yield this._retryGetObjectDetailWithReadProperty(object, device);
                             if (itemsFound.length > 0)
@@ -268,15 +275,21 @@ class BacnetUtilitiesClass extends node_events_1.default {
     _retryGetObjectDetailWithReadProperty(items, device) {
         return __awaiter(this, void 0, void 0, function* () {
             const itemsFound = [];
+            let failedCount = 0;
             for (const item of items) {
                 try {
                     const res = yield this._getObjectDetailWithReadProperty(device, item);
                     if (res)
                         itemsFound.push(res);
+                    failedCount = 0;
                 }
                 catch (error) {
+                    if (failedCount >= 5)
+                        throw error; // stop retrying after 5 consecutive failures
                 }
             }
+            if (failedCount == items.length)
+                throw new Error("Failed to get details for all items");
             return itemsFound;
         });
     }
@@ -328,6 +341,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
                 GlobalVariables_1.PropertyIds.PROP_OBJECT_TYPE, GlobalVariables_1.PropertyIds.PROP_UNITS,
                 GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE
             ];
+            const propertiesLength = properties.length;
             const itemInfo = {
                 objectId: objectId,
                 id: objectId.instance,
@@ -339,6 +353,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
             const deviceAddress = device.address;
             if (!deviceAddress)
                 throw new Error("Device address is required");
+            let failedCount = 0;
             while (properties.length > 0) {
                 try {
                     const property = properties.shift();
@@ -349,14 +364,14 @@ class BacnetUtilitiesClass extends node_events_1.default {
                             itemInfo[key] = formated[key];
                         }
                     }
-                    else {
-                        // console.log("property is undefined");
-                    }
                 }
                 catch (error) {
+                    failedCount++;
                     // console.error(error);
                 }
             }
+            if (failedCount === propertiesLength)
+                throw new Error("failed to get object details");
             return itemInfo;
         });
     }
@@ -394,7 +409,9 @@ class BacnetUtilitiesClass extends node_events_1.default {
                 }
                 return lodash.flattenDeep(res);
             }
-            catch (error) { }
+            catch (error) {
+                throw error;
+            }
         });
     }
     getChildrenNewValueWithReadProperty(device, children) {
@@ -403,6 +420,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
             const res = [];
             try {
                 const deep_children = [...children];
+                let rejectCount = 0;
                 while (deep_children.length > 0) {
                     const child = deep_children.shift();
                     const deviceAddress = device.address;
@@ -416,9 +434,13 @@ class BacnetUtilitiesClass extends node_events_1.default {
                             child.currentValue = this._getObjValue(value);
                             res.push(child);
                         }
-                        catch (error) { }
+                        catch (error) {
+                            rejectCount++;
+                        }
                     }
                 }
+                if (rejectCount === children.length)
+                    throw new Error("Failed to get values for all children");
                 return res;
             }
             catch (error) {
@@ -431,14 +453,9 @@ class BacnetUtilitiesClass extends node_events_1.default {
     //////////////////////////////////////////////////////////////////////
     _getPropertyValue(address, sadr, objectId, propertyId) {
         return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const data = yield this.readProperty(address, sadr, objectId, propertyId);
-                const formated = this._formatProperty(data);
-                return formated;
-            }
-            catch (error) {
-                throw error;
-            }
+            const data = yield this.readProperty(address, sadr, objectId, propertyId);
+            const formated = this._formatProperty(data);
+            return formated;
         });
     }
     getDeviceId(address, sadr) {

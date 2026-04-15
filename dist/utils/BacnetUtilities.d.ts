@@ -1,4 +1,4 @@
-import * as bacnet from "bacstack";
+import bacnet from "bacstack";
 import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty } from "../Interfaces";
 import EventEmitter from "node:events";
 declare class BacnetUtilitiesClass extends EventEmitter {
@@ -15,7 +15,7 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     readProperty(address: string, sadr: any, objectId: IObjectId, propertyId: number | string, clientOptions?: any): Promise<IReadProperty>;
     _getDeviceObjectList(device: IDevice, SENSOR_TYPES: Array<number>, getListUsingFragment?: boolean): Promise<IObjectId[]>;
     getItemListByFragment(device: IDevice, objectId: IObjectId): Promise<IObjectId[]>;
-    _getObjectDetail(device: IDevice, objects: Array<IObjectId>): Promise<{
+    _getObjectDetail(device: IDevice, objects: IObjectId[]): Promise<{
         [key: string]: string | boolean | number;
     }[]>;
     private _retryGetObjectDetailWithReadProperty;

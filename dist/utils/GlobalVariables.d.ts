@@ -13,13 +13,3 @@ export declare const UNITS_TYPES: {
     [key: number]: string;
 };
 export declare const SENSOR_TYPES: number[];
-export declare const COV_EVENTS_NAMES: {
-    readonly subscribed: "subscribed";
-    readonly subscribe: "subscribe";
-    readonly failed: "failed";
-    readonly changed: "changed";
-    readonly unsubscribe: "unsubscribe";
-    readonly unsubscribed: "unsubscribed";
-    readonly error: "error";
-    readonly exit: "exit";
-};
