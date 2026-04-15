@@ -1,0 +1,30 @@
+{
+  "name": "spinal-bacnet-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bacstack": "file:./lib/bacstack",
+    "lodash": "^4.18.1",
+    "node-ipc": "^12.0.0",
+    "typescript": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.24",
+    "@types/node": "^25.6.0",
+    "@types/node-ipc": "^9.2.3",
+    "@types/typescript": "^0.4.29",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2"
+  },
+  "spinalDependencies": {}
+}
