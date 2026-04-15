@@ -13,14 +13,22 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./Interfaces"), exports);
 __exportStar(require("./utils"), exports);
-// import { launchBacnetService } from "./utils/functions";
-// launchBacnetService().then(async (result) => {
-//     await launchBacnetService() // Attempt to launch again to test if it detects the already running service
-//     console.log("Bacnet service launched successfully.");
-// }).catch((err) => {
-//     console.error(`Failed to launch Bacnet service: ${err}`)
-// });
+const functions_1 = require("./utils/functions");
+(0, functions_1.launchBacnetService)().then((result) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("Bacnet service launched successfully.");
+})).catch((err) => {
+    console.error(`Failed to launch Bacnet service: ${err}`);
+});
 //# sourceMappingURL=index.js.map

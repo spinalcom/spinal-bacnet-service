@@ -37,7 +37,6 @@ function listenBacnetEvents(ipc, data, socket) {
     return __awaiter(this, void 0, void 0, function* () {
         const { id } = data;
         const result = yield handleBacnetRequest(data);
-        console.log(result);
         ipc.server.emit(socket, `${constants_1.RESPONSE_EVENT_NAME}_${id}`, result);
     });
 }

@@ -1,13 +1,8 @@
-import { SpinalNode } from "spinal-env-viewer-graph-service";
-import NetworkService from "spinal-model-bmsnetwork";
-// import { SpinalDevice } from "../modules/SpinalDevice";
+
 import { IObjectId } from "./IObjectId";
 
 export interface ICovData {
-    // spinalDevice: SpinalDevice;
-    // networkService: NetworkService;
-    // spinalModel: SpinalListenerModel;
-    // network: SpinalNode;
+    address: string;
     deviceId: string | number;
     children: IObjectId[];
 }

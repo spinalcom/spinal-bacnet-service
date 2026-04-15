@@ -16,9 +16,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./IBacnetRequest"), exports);
 __exportStar(require("./ICovObj"), exports);
-__exportStar(require("./IDataBacnetValue"), exports);
-__exportStar(require("./IDataDiscover"), exports);
-__exportStar(require("./IDataMonitor"), exports);
 __exportStar(require("./IDevice"), exports);
 __exportStar(require("./IObjectId"), exports);
 __exportStar(require("./IReadPropertyMultiple"), exports);

@@ -27,7 +27,6 @@ export async function launchBacnetService(port = DEFAULT_PORT): Promise<void> {
 async function listenBacnetEvents(ipc, data, socket): Promise<void> {
     const { id } = data;
     const result = await handleBacnetRequest(data);
-    console.log(result);
     ipc.server.emit(socket, `${RESPONSE_EVENT_NAME}_${id}`, result);
 }
 

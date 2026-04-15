@@ -1,5 +1,6 @@
 import { IObjectId } from "./IObjectId";
 export interface ICovData {
+    address: string;
     deviceId: string | number;
     children: IObjectId[];
 }
