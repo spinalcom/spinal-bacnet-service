@@ -448,6 +448,48 @@ class BacnetUtilitiesClass extends node_events_1.default {
             }
         });
     }
+    /////////////////////////////////////////////////////////////////////
+    ////                  PILOT BACNET                               ////
+    /////////////////////////////////////////////////////////////////////
+    writeProperty(request) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const types = this._getPossibleDataTypes(request.objectId.type);
+            let success = false;
+            let data = null;
+            while (types.length > 0 && !success) {
+                const type = types.shift();
+                try {
+                    if (typeof type === "undefined")
+                        throw new Error("No more data types to try");
+                    data = yield this._writePropertyWithType(request, type);
+                    success = true;
+                }
+                catch (error) { }
+            }
+            if (!success)
+                throw new Error("Failed to write property with all possible data types");
+            console.log("success");
+            return data;
+        });
+    }
+    _writePropertyWithType(request, dataType) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                const client = yield BacnetUtilities.getClient();
+                const value = dataType === GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED ? (request.value ? 1 : 0) : request.value;
+                const priority = this._getBacnetPriority(request);
+                if (!request.SADR || typeof request.SADR === "object" && Object.keys(request.SADR).length === 0)
+                    request.SADR = null;
+                client.writeProperty(request.address, request.SADR, request.objectId, GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE, [{ type: dataType, value: value }], { priority }, (err, value) => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve(value);
+                });
+            }));
+        });
+    }
     //////////////////////////////////////////////////////////////////////
     ////                             OTHER UTILITIES                  ////
     //////////////////////////////////////////////////////////////////////
@@ -516,6 +558,45 @@ class BacnetUtilitiesClass extends node_events_1.default {
         if (property)
             return property.toLocaleLowerCase().replace('units_', '').replace("_", " ");
         return;
+    }
+    _getPossibleDataTypes(type) {
+        const analogTypes = new Set([
+            GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_INPUT,
+            GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_OUTPUT,
+            GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_VALUE,
+            GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_INPUT,
+            GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_OUTPUT,
+            GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_VALUE
+        ]);
+        const binaryTypes = new Set([
+            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_INPUT,
+            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_OUTPUT,
+            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_VALUE,
+            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_LIGHTING_OUTPUT
+        ]);
+        if (analogTypes.has(type)) {
+            return [
+                GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_UNSIGNED_INT, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_SIGNED_INT,
+                GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_REAL, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_DOUBLE
+            ];
+        }
+        if (binaryTypes.has(type))
+            return [GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_BOOLEAN];
+        return [
+            GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_OCTET_STRING,
+            GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_CHARACTER_STRING,
+            GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_BIT_STRING
+        ];
+    }
+    _getBacnetPriority(req) {
+        // if priority is defined in REQ
+        if (req.priority && !isNaN(parseInt(req.priority)))
+            return parseInt(req.priority);
+        // else if priority is defined in .env
+        if (process.env.BACNET_PRIORITY && !isNaN(parseInt(process.env.BACNET_PRIORITY)))
+            return parseInt(process.env.BACNET_PRIORITY);
+        // else use low priority
+        return 16;
     }
 }
 const BacnetUtilities = BacnetUtilitiesClass.getInstance();

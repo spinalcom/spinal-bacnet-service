@@ -1,5 +1,5 @@
 import bacnet from "bacstack";
-import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty } from "../Interfaces";
+import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty, IWriteRequest } from "../Interfaces";
 import EventEmitter from "node:events";
 declare class BacnetUtilitiesClass extends EventEmitter {
     private static instance;
@@ -28,6 +28,8 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     }> | undefined>;
     private getChildrenNewValueWithReadPropertyMultiple;
     private getChildrenNewValueWithReadProperty;
+    writeProperty(request: IWriteRequest): Promise<any>;
+    private _writePropertyWithType;
     _getPropertyValue(address: string, sadr: any, objectId: IObjectId, propertyId: number | string): Promise<any>;
     getDeviceId(address: string, sadr: any): Promise<number>;
     _formatProperty(propertyValue: any): {
@@ -38,6 +40,8 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     _getPropertyNameByCode(type: number): string | undefined;
     _getObjectTypeByCode(typeCode: number | string): string | undefined;
     _getUnitsByCode(typeCode: number): string | undefined;
+    private _getPossibleDataTypes;
+    private _getBacnetPriority;
 }
 declare const BacnetUtilities: BacnetUtilitiesClass;
 export default BacnetUtilities;

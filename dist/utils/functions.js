@@ -21,8 +21,10 @@ const cov_1 = require("./cov");
 function launchBacnetService() {
     return __awaiter(this, arguments, void 0, function* (port = constants_1.DEFAULT_PORT) {
         const isAlreadyRunning = yield serverIsRunning(port);
-        if (isAlreadyRunning)
-            return console.log(`Bacnet service is already running on port ${port}.`);
+        if (isAlreadyRunning) {
+            console.log(`Bacnet service is already running on port ${port}.`);
+            return false;
+        }
         node_ipc_1.default.config.id = constants_1.SERVICE_NAME;
         node_ipc_1.default.config.retry = constants_1.IPC_RETRY_INTERVAL;
         node_ipc_1.default.config.silent = true; // Disable IPC logging
@@ -31,6 +33,7 @@ function launchBacnetService() {
             node_ipc_1.default.server.on(constants_1.COV_EVENT_NAME, (data, socket) => __awaiter(this, void 0, void 0, function* () { return listenBacnetCovEvents(node_ipc_1.default, data, socket); }));
         });
         node_ipc_1.default.server.start();
+        return true;
     });
 }
 function listenBacnetEvents(ipc, data, socket) {

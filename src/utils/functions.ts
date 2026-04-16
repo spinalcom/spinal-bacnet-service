@@ -6,9 +6,12 @@ import BacnetUtilities from "./BacnetUtilities";
 import { EventPayload, SpinalCov } from "./cov";
 
 
-export async function launchBacnetService(port = DEFAULT_PORT): Promise<void> {
+export async function launchBacnetService(port = DEFAULT_PORT): Promise<boolean> {
     const isAlreadyRunning = await serverIsRunning(port);
-    if (isAlreadyRunning) return console.log(`Bacnet service is already running on port ${port}.`);
+    if (isAlreadyRunning) {
+        console.log(`Bacnet service is already running on port ${port}.`);
+        return false;
+    }
 
     ipc.config.id = SERVICE_NAME;
     ipc.config.retry = IPC_RETRY_INTERVAL;
@@ -22,6 +25,7 @@ export async function launchBacnetService(port = DEFAULT_PORT): Promise<void> {
 
 
     ipc.server.start();
+    return true;
 }
 
 async function listenBacnetEvents(ipc, data, socket): Promise<void> {

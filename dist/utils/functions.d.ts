@@ -1,1 +1,1 @@
-export declare function launchBacnetService(port?: number): Promise<void>;
+export declare function launchBacnetService(port?: number): Promise<boolean>;

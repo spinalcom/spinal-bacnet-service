@@ -24,8 +24,8 @@
 
 import * as lodash from "lodash";
 import bacnet from "bacstack";
-import { ObjectTypes, PropertyIds, PropertyNames, ObjectTypesCode, UNITS_TYPES } from "./GlobalVariables";
-import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty, ICovData } from "../Interfaces";
+import { ObjectTypes, PropertyIds, PropertyNames, ObjectTypesCode, UNITS_TYPES, APPLICATION_TAGS } from "./GlobalVariables";
+import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty, ICovData, IWriteRequest } from "../Interfaces";
 import { SEGMENTATIONS } from "./GlobalVariables";
 import EventEmitter from "node:events";
 import { CLIENT_RESET_EVENT } from "./constants";
@@ -445,6 +445,53 @@ class BacnetUtilitiesClass extends EventEmitter {
    }
 
 
+   /////////////////////////////////////////////////////////////////////
+   ////                  PILOT BACNET                               ////
+   /////////////////////////////////////////////////////////////////////
+
+   public async writeProperty(request: IWriteRequest): Promise<any> {
+      const types = this._getPossibleDataTypes(request.objectId.type);
+      let success = false;
+      let data = null;
+
+      while (types.length > 0 && !success) {
+         const type = types.shift();
+         try {
+            if (typeof type === "undefined") throw new Error("No more data types to try");
+            data = await this._writePropertyWithType(request, type);
+            success = true;
+         } catch (error) { }
+      }
+
+      if (!success) throw new Error("Failed to write property with all possible data types");
+      console.log("success")
+      return data;
+   }
+
+
+   private async _writePropertyWithType(request: IWriteRequest, dataType: number): Promise<any> {
+      return new Promise(async (resolve, reject) => {
+         const client = await BacnetUtilities.getClient();
+         const value = dataType === APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED ? (request.value ? 1 : 0) : request.value;
+
+         const priority = this._getBacnetPriority(request);
+
+         if (!request.SADR || typeof request.SADR === "object" && Object.keys(request.SADR).length === 0) request.SADR = null;
+
+         client.writeProperty(request.address, request.SADR, request.objectId, PropertyIds.PROP_PRESENT_VALUE, [{ type: dataType, value: value }], { priority }, (err: Error, value: any) => {
+            if (err) {
+               reject(err);
+               return;
+            }
+
+            resolve(value);
+         })
+      });
+
+   }
+
+
+
    //////////////////////////////////////////////////////////////////////
    ////                             OTHER UTILITIES                  ////
    //////////////////////////////////////////////////////////////////////
@@ -522,6 +569,52 @@ class BacnetUtilitiesClass extends EventEmitter {
       const property = UNITS_TYPES[typeCode];
       if (property) return property.toLocaleLowerCase().replace('units_', '').replace("_", " ");
       return;
+   }
+
+   private _getPossibleDataTypes(type: number | string): number[] {
+      const analogTypes = new Set([
+         ObjectTypes.OBJECT_ANALOG_INPUT,
+         ObjectTypes.OBJECT_ANALOG_OUTPUT,
+         ObjectTypes.OBJECT_ANALOG_VALUE,
+         ObjectTypes.OBJECT_MULTI_STATE_INPUT,
+         ObjectTypes.OBJECT_MULTI_STATE_OUTPUT,
+         ObjectTypes.OBJECT_MULTI_STATE_VALUE
+      ]);
+
+      const binaryTypes = new Set([
+         ObjectTypes.OBJECT_BINARY_INPUT,
+         ObjectTypes.OBJECT_BINARY_OUTPUT,
+         ObjectTypes.OBJECT_BINARY_VALUE,
+         ObjectTypes.OBJECT_BINARY_LIGHTING_OUTPUT
+      ]);
+
+      if (analogTypes.has(type)) {
+         return [
+            APPLICATION_TAGS.BACNET_APPLICATION_TAG_UNSIGNED_INT, APPLICATION_TAGS.BACNET_APPLICATION_TAG_SIGNED_INT,
+            APPLICATION_TAGS.BACNET_APPLICATION_TAG_REAL, APPLICATION_TAGS.BACNET_APPLICATION_TAG_DOUBLE
+         ];
+      }
+
+      if (binaryTypes.has(type)) return [APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED, APPLICATION_TAGS.BACNET_APPLICATION_TAG_BOOLEAN];
+
+      return [
+         APPLICATION_TAGS.BACNET_APPLICATION_TAG_OCTET_STRING,
+         APPLICATION_TAGS.BACNET_APPLICATION_TAG_CHARACTER_STRING,
+         APPLICATION_TAGS.BACNET_APPLICATION_TAG_BIT_STRING
+      ];
+   }
+
+   private _getBacnetPriority(req: any | IWriteRequest): number {
+      // if priority is defined in REQ
+      if (req.priority && !isNaN(parseInt(req.priority)))
+         return parseInt(req.priority);
+
+      // else if priority is defined in .env
+      if (process.env.BACNET_PRIORITY && !isNaN(parseInt(process.env.BACNET_PRIORITY)))
+         return parseInt(process.env.BACNET_PRIORITY)
+
+      // else use low priority
+      return 16;
    }
 
 }
