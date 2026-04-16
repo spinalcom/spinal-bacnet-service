@@ -451,8 +451,8 @@ class BacnetUtilitiesClass extends node_events_1.default {
     /////////////////////////////////////////////////////////////////////
     ////                  PILOT BACNET                               ////
     /////////////////////////////////////////////////////////////////////
-    writeProperty(request) {
-        return __awaiter(this, void 0, void 0, function* () {
+    writeProperty(request_1) {
+        return __awaiter(this, arguments, void 0, function* (request, releasePriority = false) {
             const types = this._getPossibleDataTypes(request.objectId.type);
             let success = false;
             let data = null;
@@ -463,6 +463,8 @@ class BacnetUtilitiesClass extends node_events_1.default {
                         throw new Error("No more data types to try");
                     data = yield this._writePropertyWithType(request, type);
                     success = true;
+                    if (releasePriority)
+                        yield this._releasePriority(request, type);
                 }
                 catch (error) { }
             }
@@ -488,6 +490,13 @@ class BacnetUtilitiesClass extends node_events_1.default {
                     resolve(value);
                 });
             }));
+        });
+    }
+    _releasePriority(request, type) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const requestCopy = JSON.parse(JSON.stringify(request));
+            requestCopy.value = null;
+            return this._writePropertyWithType(requestCopy, type);
         });
     }
     //////////////////////////////////////////////////////////////////////

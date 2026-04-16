@@ -28,8 +28,9 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     }> | undefined>;
     private getChildrenNewValueWithReadPropertyMultiple;
     private getChildrenNewValueWithReadProperty;
-    writeProperty(request: IWriteRequest): Promise<any>;
+    writeProperty(request: IWriteRequest, releasePriority?: boolean): Promise<any>;
     private _writePropertyWithType;
+    private _releasePriority;
     _getPropertyValue(address: string, sadr: any, objectId: IObjectId, propertyId: number | string): Promise<any>;
     getDeviceId(address: string, sadr: any): Promise<number>;
     _formatProperty(propertyValue: any): {

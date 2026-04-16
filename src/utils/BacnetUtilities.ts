@@ -449,7 +449,7 @@ class BacnetUtilitiesClass extends EventEmitter {
    ////                  PILOT BACNET                               ////
    /////////////////////////////////////////////////////////////////////
 
-   public async writeProperty(request: IWriteRequest): Promise<any> {
+   public async writeProperty(request: IWriteRequest, releasePriority: boolean = false): Promise<any> {
       const types = this._getPossibleDataTypes(request.objectId.type);
       let success = false;
       let data = null;
@@ -460,6 +460,7 @@ class BacnetUtilitiesClass extends EventEmitter {
             if (typeof type === "undefined") throw new Error("No more data types to try");
             data = await this._writePropertyWithType(request, type);
             success = true;
+            if (releasePriority) await this._releasePriority(request, type);
          } catch (error) { }
       }
 
@@ -488,6 +489,12 @@ class BacnetUtilitiesClass extends EventEmitter {
          })
       });
 
+   }
+
+   private async _releasePriority(request: IWriteRequest, type: number): Promise<void> {
+      const requestCopy = JSON.parse(JSON.stringify(request));
+      requestCopy.value = null;
+      return this._writePropertyWithType(requestCopy, type);
    }
 
 
