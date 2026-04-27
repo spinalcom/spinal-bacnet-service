@@ -29,6 +29,7 @@ import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty
 import { SEGMENTATIONS } from "./GlobalVariables";
 import EventEmitter from "node:events";
 import { CLIENT_RESET_EVENT } from "./constants";
+import { isValidValue, isValidValueArray } from "./functions";
 
 
 class BacnetUtilitiesClass extends EventEmitter {
@@ -546,12 +547,23 @@ class BacnetUtilitiesClass extends EventEmitter {
 
    }
 
-   public _getObjValue(value: any): boolean | string | number {
-      if (typeof value !== "object") return value;
+   public _getObjValue(value: any): boolean | string | number | any {
+      let temp_value = value;
 
-      let temp_value = Array.isArray(value) ? value[0]?.value : value.value;
-      return typeof temp_value === "object" ? "" : temp_value;
+      if (!isValidValue(value) && !isValidValueArray(value) && typeof value !== "object") temp_value = value;
+      if (isValidValue(value)) temp_value = value.value;
+      if (isValidValueArray(value)) temp_value = value.map(v => v.value);
+
+      if (Array.isArray(temp_value) && temp_value.length === 1) return temp_value[0];
+      return temp_value;
+
+      // return typeof temp_value === "object" ? "" : temp_value;
+
    }
+
+
+
+
 
    public _formatCurrentValue(value: any, type: number | string): boolean | string | number {
       if ([ObjectTypes.OBJECT_BINARY_INPUT, ObjectTypes.OBJECT_BINARY_VALUE].indexOf(type) !== -1) {

@@ -4,6 +4,7 @@ import { COV_EVENT_NAME, DEFAULT_PORT, IPC_RETRY_INTERVAL, MESSAGE_EVENT_NAME, R
 import { IBacnetRequest, IBacnetResponse } from "../Interfaces/IBacnetRequest";
 import BacnetUtilities from "./BacnetUtilities";
 import { EventPayload, SpinalCov } from "./cov";
+import { IValidValue } from "../Interfaces/IValidValue";
 
 
 export async function launchBacnetService(port = DEFAULT_PORT): Promise<boolean> {
@@ -70,4 +71,14 @@ function serverIsRunning(port: number): Promise<boolean> {
 
         socket.connect(port, "127.0.0.1");
     });
+}
+
+
+
+export function isValidValue(value: any): value is IValidValue {
+    return value && typeof value === "object" && "type" in value && "value" in value;
+}
+
+export function isValidValueArray(arr: any): arr is IValidValue[] {
+    return Array.isArray(arr) && arr.every(isValidValue);
 }

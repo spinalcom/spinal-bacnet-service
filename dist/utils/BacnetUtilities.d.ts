@@ -36,7 +36,7 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     _formatProperty(propertyValue: any): {
         [key: string]: boolean | string | number;
     };
-    _getObjValue(value: any): boolean | string | number;
+    _getObjValue(value: any): boolean | string | number | any;
     _formatCurrentValue(value: any, type: number | string): boolean | string | number;
     _getPropertyNameByCode(type: number): string | undefined;
     _getObjectTypeByCode(typeCode: number | string): string | undefined;

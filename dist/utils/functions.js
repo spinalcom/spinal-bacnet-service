@@ -13,6 +13,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.launchBacnetService = launchBacnetService;
+exports.isValidValue = isValidValue;
+exports.isValidValueArray = isValidValueArray;
 const net_1 = __importDefault(require("net"));
 const node_ipc_1 = __importDefault(require("node-ipc"));
 const constants_1 = require("./constants");
@@ -77,5 +79,11 @@ function serverIsRunning(port) {
         });
         socket.connect(port, "127.0.0.1");
     });
+}
+function isValidValue(value) {
+    return value && typeof value === "object" && "type" in value && "value" in value;
+}
+function isValidValueArray(arr) {
+    return Array.isArray(arr) && arr.every(isValidValue);
 }
 //# sourceMappingURL=functions.js.map

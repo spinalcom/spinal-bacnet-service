@@ -75,6 +75,7 @@ const GlobalVariables_1 = require("./GlobalVariables");
 const GlobalVariables_2 = require("./GlobalVariables");
 const node_events_1 = __importDefault(require("node:events"));
 const constants_1 = require("./constants");
+const functions_1 = require("./functions");
 class BacnetUtilitiesClass extends node_events_1.default {
     constructor() {
         super();
@@ -539,11 +540,17 @@ class BacnetUtilitiesClass extends node_events_1.default {
         return {};
     }
     _getObjValue(value) {
-        var _a;
-        if (typeof value !== "object")
-            return value;
-        let temp_value = Array.isArray(value) ? (_a = value[0]) === null || _a === void 0 ? void 0 : _a.value : value.value;
-        return typeof temp_value === "object" ? "" : temp_value;
+        let temp_value = value;
+        if (!(0, functions_1.isValidValue)(value) && !(0, functions_1.isValidValueArray)(value) && typeof value !== "object")
+            temp_value = value;
+        if ((0, functions_1.isValidValue)(value))
+            temp_value = value.value;
+        if ((0, functions_1.isValidValueArray)(value))
+            temp_value = value.map(v => v.value);
+        if (Array.isArray(temp_value) && temp_value.length === 1)
+            return temp_value[0];
+        return temp_value;
+        // return typeof temp_value === "object" ? "" : temp_value;
     }
     _formatCurrentValue(value, type) {
         if ([GlobalVariables_1.ObjectTypes.OBJECT_BINARY_INPUT, GlobalVariables_1.ObjectTypes.OBJECT_BINARY_VALUE].indexOf(type) !== -1) {
