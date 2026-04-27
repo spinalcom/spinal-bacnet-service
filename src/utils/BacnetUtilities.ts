@@ -291,6 +291,7 @@ class BacnetUtilitiesClass extends EventEmitter {
                { id: PropertyIds.PROP_UNITS },
                { id: PropertyIds.PROP_MAX_PRES_VALUE },
                { id: PropertyIds.PROP_MIN_PRES_VALUE },
+               { id: PropertyIds.PROP_BIT_TEXT },
             ]
          }))
          const data = await this.readPropertyMultiple(deviceAddress, device.SADR, requestArray);
@@ -326,7 +327,7 @@ class BacnetUtilitiesClass extends EventEmitter {
       const properties = [
          PropertyIds.PROP_OBJECT_NAME, PropertyIds.PROP_PRESENT_VALUE, PropertyIds.PROP_DESCRIPTION,
          PropertyIds.PROP_OBJECT_TYPE, PropertyIds.PROP_UNITS,
-         PropertyIds.PROP_MAX_PRES_VALUE, PropertyIds.PROP_MIN_PRES_VALUE
+         PropertyIds.PROP_MAX_PRES_VALUE, PropertyIds.PROP_MIN_PRES_VALUE, PropertyIds.PROP_BIT_TEXT
       ]
 
       const propertiesLength = properties.length;

@@ -309,6 +309,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
                         { id: GlobalVariables_1.PropertyIds.PROP_UNITS },
                         { id: GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE },
                         { id: GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE },
+                        { id: GlobalVariables_1.PropertyIds.PROP_BIT_TEXT },
                     ]
                 }));
                 const data = yield this.readPropertyMultiple(deviceAddress, device.SADR, requestArray);
@@ -339,7 +340,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
             const properties = [
                 GlobalVariables_1.PropertyIds.PROP_OBJECT_NAME, GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE, GlobalVariables_1.PropertyIds.PROP_DESCRIPTION,
                 GlobalVariables_1.PropertyIds.PROP_OBJECT_TYPE, GlobalVariables_1.PropertyIds.PROP_UNITS,
-                GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE
+                GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_BIT_TEXT
             ];
             const propertiesLength = properties.length;
             const itemInfo = {

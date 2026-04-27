@@ -16,4 +16,9 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./Interfaces"), exports);
 __exportStar(require("./utils"), exports);
+// launchBacnetService().then(async (result) => {
+//     console.log(`Bacnet service launched with result: ${result}`);
+// }).catch((err) => {
+//     console.error(`Failed to launch Bacnet service: ${err}`)
+// });
 //# sourceMappingURL=index.js.map

@@ -20,7 +20,7 @@ export async function launchBacnetService(port = DEFAULT_PORT): Promise<boolean>
     ipc.serveNet("127.0.0.1", port, () => {
         ipc.server.on(MESSAGE_EVENT_NAME, async (data, socket) => listenBacnetEvents(ipc, data, socket));
         ipc.server.on(COV_EVENT_NAME, async (data, socket) => listenBacnetCovEvents(ipc, data, socket));
-
+        console.log(`Bacnet service is listening on port ${port}...`);
     });
 
 

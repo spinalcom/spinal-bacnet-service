@@ -31,6 +31,7 @@ function launchBacnetService() {
         node_ipc_1.default.serveNet("127.0.0.1", port, () => {
             node_ipc_1.default.server.on(constants_1.MESSAGE_EVENT_NAME, (data, socket) => __awaiter(this, void 0, void 0, function* () { return listenBacnetEvents(node_ipc_1.default, data, socket); }));
             node_ipc_1.default.server.on(constants_1.COV_EVENT_NAME, (data, socket) => __awaiter(this, void 0, void 0, function* () { return listenBacnetCovEvents(node_ipc_1.default, data, socket); }));
+            console.log(`Bacnet service is listening on port ${port}...`);
         });
         node_ipc_1.default.server.start();
         return true;
