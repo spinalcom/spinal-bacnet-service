@@ -83,7 +83,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
         this.clientState = {
             // failed: { count: 0, time: null },
             // success: { count: 0, time: null },
-            consecutiveFailures: 0
+            consecutiveFailures: 0,
         };
     }
     static getInstance() {
@@ -118,15 +118,15 @@ class BacnetUtilitiesClass extends node_events_1.default {
         }
     }
     _listenClientErrorEvent(client) {
-        client.on('close', () => {
+        client.on("close", () => {
             console.log("client closed");
             // this._client = null;
         });
-        client.on('timeout', () => {
+        client.on("timeout", () => {
             console.log("client timeout");
             // this._client = null;
         });
-        client.on('error', () => {
+        client.on("error", () => {
             console.log("error client");
             // this._client = null;
         });
@@ -191,7 +191,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
                 if (deviceAcceptSegmentation) {
                     const params = [{ objectId: objectId, properties: [{ id: GlobalVariables_1.PropertyIds.PROP_OBJECT_LIST }] }];
                     let data = yield this.readPropertyMultiple(deviceAddress, device.SADR, params);
-                    const dataFormatted = data.values.map(el => el.values.map(el2 => el2.value));
+                    const dataFormatted = data.values.map((el) => el.values.map((el2) => el2.value));
                     values = lodash.flattenDeep(dataFormatted);
                 }
                 else {
@@ -300,21 +300,12 @@ class BacnetUtilitiesClass extends node_events_1.default {
                 const deviceAddress = device.address;
                 if (!deviceAddress)
                     throw new Error("Device address is required");
-                const requestArray = objects.map(el => ({
+                const requestArray = objects.map((el) => ({
                     objectId: JSON.parse(JSON.stringify(el)),
-                    properties: [
-                        { id: GlobalVariables_1.PropertyIds.PROP_OBJECT_NAME },
-                        { id: GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE },
-                        { id: GlobalVariables_1.PropertyIds.PROP_DESCRIPTION },
-                        { id: GlobalVariables_1.PropertyIds.PROP_OBJECT_TYPE },
-                        { id: GlobalVariables_1.PropertyIds.PROP_UNITS },
-                        { id: GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE },
-                        { id: GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE },
-                        { id: GlobalVariables_1.PropertyIds.PROP_BIT_TEXT },
-                    ]
+                    properties: [{ id: GlobalVariables_1.PropertyIds.PROP_OBJECT_NAME }, { id: GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE }, { id: GlobalVariables_1.PropertyIds.PROP_DESCRIPTION }, { id: GlobalVariables_1.PropertyIds.PROP_OBJECT_TYPE }, { id: GlobalVariables_1.PropertyIds.PROP_UNITS }, { id: GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE }, { id: GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE }, { id: GlobalVariables_1.PropertyIds.PROP_BIT_TEXT }],
                 }));
                 const data = yield this.readPropertyMultiple(deviceAddress, device.SADR, requestArray);
-                return data.values.map(el => {
+                return data.values.map((el) => {
                     const { objectId } = el;
                     const itemInfo = {
                         objectId: objectId,
@@ -322,7 +313,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
                         typeId: objectId.type,
                         type: this._getObjectTypeByCode(objectId.type),
                         instance: objectId.instance,
-                        deviceId: device.deviceId
+                        deviceId: device.deviceId,
                     };
                     const formated = this._formatProperty(el);
                     for (let key in formated) {
@@ -338,11 +329,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
     }
     _getObjectDetailWithReadProperty(device, objectId) {
         return __awaiter(this, void 0, void 0, function* () {
-            const properties = [
-                GlobalVariables_1.PropertyIds.PROP_OBJECT_NAME, GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE, GlobalVariables_1.PropertyIds.PROP_DESCRIPTION,
-                GlobalVariables_1.PropertyIds.PROP_OBJECT_TYPE, GlobalVariables_1.PropertyIds.PROP_UNITS,
-                GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_BIT_TEXT
-            ];
+            const properties = [GlobalVariables_1.PropertyIds.PROP_OBJECT_NAME, GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE, GlobalVariables_1.PropertyIds.PROP_DESCRIPTION, GlobalVariables_1.PropertyIds.PROP_OBJECT_TYPE, GlobalVariables_1.PropertyIds.PROP_UNITS, GlobalVariables_1.PropertyIds.PROP_MAX_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_MIN_PRES_VALUE, GlobalVariables_1.PropertyIds.PROP_BIT_TEXT];
             const propertiesLength = properties.length;
             const itemInfo = {
                 objectId: objectId,
@@ -350,7 +337,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
                 typeId: objectId.type,
                 type: this._getObjectTypeByCode(objectId.type),
                 instance: objectId.instance,
-                deviceId: device.deviceId
+                deviceId: device.deviceId,
             };
             const deviceAddress = device.address;
             if (!deviceAddress)
@@ -388,7 +375,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
     getChildrenNewValueWithReadPropertyMultiple(device, children) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const requestArray = children.map(el => ({ objectId: el, properties: [{ id: GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE }] }));
+                const requestArray = children.map((el) => ({ objectId: el, properties: [{ id: GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE }] }));
                 const list_chunked = lodash.chunk(requestArray, 50);
                 const deviceAddress = device.address;
                 if (!deviceAddress)
@@ -399,12 +386,12 @@ class BacnetUtilitiesClass extends node_events_1.default {
                     if (!arr)
                         continue;
                     const data = yield this.readPropertyMultiple(deviceAddress, device.SADR, arr);
-                    const dataFormated = data.values.map(el => {
+                    const dataFormated = data.values.map((el) => {
                         const value = this._getObjValue(el.values[0].value);
                         return {
                             id: el.objectId.instance,
                             type: el.objectId.type,
-                            currentValue: this._formatCurrentValue(value, el.objectId.type)
+                            currentValue: this._formatCurrentValue(value, el.objectId.type),
                         };
                     });
                     res.push(dataFormated);
@@ -480,9 +467,10 @@ class BacnetUtilitiesClass extends node_events_1.default {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 const client = yield BacnetUtilities.getClient();
-                const value = dataType === GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED ? (request.value ? 1 : 0) : request.value;
+                const valueConverted = this._convertValueToBoolean(request.value) ? 1 : 0;
+                const value = dataType === GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED ? valueConverted : request.value;
                 const priority = this._getBacnetPriority(request);
-                if (!request.SADR || typeof request.SADR === "object" && Object.keys(request.SADR).length === 0)
+                if (!request.SADR || (typeof request.SADR === "object" && Object.keys(request.SADR).length === 0))
                     request.SADR = null;
                 client.writeProperty(request.address, request.SADR, request.objectId, GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE, [{ type: dataType, value: value }], { priority }, (err, value) => {
                     if (err) {
@@ -493,6 +481,17 @@ class BacnetUtilitiesClass extends node_events_1.default {
                 });
             }));
         });
+    }
+    _convertValueToBoolean(value) {
+        if (typeof value === "boolean")
+            return value;
+        if (typeof value === "number")
+            return value !== 0;
+        if (typeof value === "string") {
+            const val = value.toLowerCase();
+            return val === "true" || val === "1";
+        }
+        return false;
     }
     _releasePriority(request, type) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -546,7 +545,7 @@ class BacnetUtilitiesClass extends node_events_1.default {
         if ((0, functions_1.isValidValue)(value))
             temp_value = value.value;
         if ((0, functions_1.isValidValueArray)(value))
-            temp_value = value.map(v => v.value);
+            temp_value = value.map((v) => v.value);
         if (Array.isArray(temp_value) && temp_value.length === 1)
             return temp_value[0];
         return temp_value;
@@ -561,49 +560,30 @@ class BacnetUtilitiesClass extends node_events_1.default {
     _getPropertyNameByCode(type) {
         const property = GlobalVariables_1.PropertyNames[type];
         if (property)
-            return property.toLocaleLowerCase().replace('prop_', '');
+            return property.toLocaleLowerCase().replace("prop_", "");
         return;
     }
     _getObjectTypeByCode(typeCode) {
         const property = GlobalVariables_1.ObjectTypesCode[typeCode];
         if (property)
-            return property.toLocaleLowerCase().replace('object_', '');
+            return property.toLocaleLowerCase().replace("object_", "");
         return;
     }
     _getUnitsByCode(typeCode) {
         const property = GlobalVariables_1.UNITS_TYPES[typeCode];
         if (property)
-            return property.toLocaleLowerCase().replace('units_', '').replace("_", " ");
+            return property.toLocaleLowerCase().replace("units_", "").replace("_", " ");
         return;
     }
     _getPossibleDataTypes(type) {
-        const analogTypes = new Set([
-            GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_INPUT,
-            GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_OUTPUT,
-            GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_VALUE,
-            GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_INPUT,
-            GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_OUTPUT,
-            GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_VALUE
-        ]);
-        const binaryTypes = new Set([
-            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_INPUT,
-            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_OUTPUT,
-            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_VALUE,
-            GlobalVariables_1.ObjectTypes.OBJECT_BINARY_LIGHTING_OUTPUT
-        ]);
+        const analogTypes = new Set([GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_INPUT, GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_OUTPUT, GlobalVariables_1.ObjectTypes.OBJECT_ANALOG_VALUE, GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_INPUT, GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_OUTPUT, GlobalVariables_1.ObjectTypes.OBJECT_MULTI_STATE_VALUE]);
+        const binaryTypes = new Set([GlobalVariables_1.ObjectTypes.OBJECT_BINARY_INPUT, GlobalVariables_1.ObjectTypes.OBJECT_BINARY_OUTPUT, GlobalVariables_1.ObjectTypes.OBJECT_BINARY_VALUE, GlobalVariables_1.ObjectTypes.OBJECT_BINARY_LIGHTING_OUTPUT]);
         if (analogTypes.has(type)) {
-            return [
-                GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_UNSIGNED_INT, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_SIGNED_INT,
-                GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_REAL, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_DOUBLE
-            ];
+            return [GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_UNSIGNED_INT, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_SIGNED_INT, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_REAL, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_DOUBLE];
         }
         if (binaryTypes.has(type))
             return [GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_BOOLEAN];
-        return [
-            GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_OCTET_STRING,
-            GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_CHARACTER_STRING,
-            GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_BIT_STRING
-        ];
+        return [GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_OCTET_STRING, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_CHARACTER_STRING, GlobalVariables_1.APPLICATION_TAGS.BACNET_APPLICATION_TAG_BIT_STRING];
     }
     _getBacnetPriority(req) {
         // if priority is defined in REQ
