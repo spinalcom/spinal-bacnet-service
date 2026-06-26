@@ -41,13 +41,19 @@ function launchBacnetService() {
 }
 function listenBacnetEvents(ipc, data, socket) {
     return __awaiter(this, void 0, void 0, function* () {
+        const socketId = data._clientId || `${socket.remoteAddress}:${socket.remotePort}`;
+        console.log(`[RECEIVED] - Received "${data.name}" Bacnet request from ${socketId}`);
         const { id } = data;
         const result = yield handleBacnetRequest(data);
         ipc.server.emit(socket, `${constants_1.RESPONSE_EVENT_NAME}_${id}`, result);
+        console.log(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
     });
 }
 function listenBacnetCovEvents(ipc, data, socket) {
     return __awaiter(this, void 0, void 0, function* () {
+        const socketId = data._clientId || `${socket.remoteAddress}:${socket.remotePort}`;
+        console.log(`[RECEIVED] - Received COV event from ${socketId}`);
+        socket["socketId"] = socketId; // Attach the socketId to the socket for later reference
         cov_1.SpinalCov.getInstance().emit("message", { data, ipc, socket });
     });
 }
@@ -69,12 +75,20 @@ function handleBacnetRequest(data) {
 function serverIsRunning(port) {
     return new Promise((resolve, reject) => {
         const socket = new net_1.default.Socket();
-        socket.once("connect", () => {
+        const cleanup = () => {
+            socket.removeAllListeners();
             socket.destroy();
+        };
+        socket.once("connect", () => {
+            cleanup();
             resolve(true);
         });
         socket.once("error", () => {
-            socket.destroy();
+            cleanup();
+            resolve(false);
+        });
+        socket.once("timeout", () => {
+            cleanup();
             resolve(false);
         });
         socket.connect(port, "127.0.0.1");

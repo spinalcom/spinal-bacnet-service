@@ -1,4 +1,5 @@
 import { EventEmitter } from "stream";
+import net from "net";
 export type EventPayload = {
     error?: {
         message: string;
@@ -6,10 +7,13 @@ export type EventPayload = {
     key?: string;
     data?: any;
     eventName: string;
+    _clientId?: string;
+    timestamp?: number;
 };
 export declare class SpinalCov extends EventEmitter {
     private static instance;
     private ipc;
+    monitoredToSocketMap: Map<string, net.Socket[]>;
     private sockets;
     private constructor();
     static getInstance(): SpinalCov;
@@ -17,8 +21,9 @@ export declare class SpinalCov extends EventEmitter {
     private _subscribeToList;
     private _unsubscribeFromList;
     private _subscribe;
+    private _addSocketToMonitoredKey;
     private _unsubscribe;
-    private _subscribeProperty;
+    private _sendSubscribeRequestToBacnet;
     private _listenChangeEvent;
     private _sendEvent;
 }

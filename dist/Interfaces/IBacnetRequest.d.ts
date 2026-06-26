@@ -4,6 +4,8 @@ export interface IBacnetRequest {
     name: string;
     id: string;
     parameters: any[];
+    _clientId?: string;
+    timestamp?: number;
 }
 export interface IBacnetResponse {
     status: "success" | "error";

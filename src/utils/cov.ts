@@ -3,144 +3,146 @@ import BacnetUtilities from "./BacnetUtilities";
 import { ICovSubscribeReq, IObjectId } from "../Interfaces";
 import { BACNET_COV_EVENT_NAME, COV_EVENTS_NAMES } from "./constants";
 import { EventEmitter } from "stream";
-
+import net from "net";
 
 export type EventPayload = {
-    error?: { message: string };
-    key?: string;
-    data?: any;
-    eventName: string;
+	error?: { message: string };
+	key?: string;
+	data?: any;
+	eventName: string;
+	_clientId?: string;
+	timestamp?: number;
 };
 
-
 export class SpinalCov extends EventEmitter {
+	private static instance: SpinalCov;
+	private ipc: any;
+	monitoredToSocketMap: Map<string, net.Socket[]> = new Map();
+	private sockets: any[] = [];
 
-    private static instance: SpinalCov
-    private ipc: any;
-    private sockets: any[] = [];
+	private constructor() {
+		super();
+		this._listenEventMessage();
+	}
 
-    private constructor() {
-        super();
-        this._listenEventMessage();
-    }
+	public static getInstance(): SpinalCov {
+		if (!this.instance) {
+			this.instance = new SpinalCov();
+		}
+		return this.instance;
+	}
 
-    public static getInstance(): SpinalCov {
-        if (!this.instance) {
-            this.instance = new SpinalCov();
-        }
-        return this.instance;
-    }
+	private _listenEventMessage() {
+		this.on("message", async ({ data, ipc, socket }) => {
+			if (!this.ipc) this.ipc = ipc;
 
-    private _listenEventMessage() {
-        this.on("message", async ({ data, ipc, socket }) => {
-            if (!this.ipc) this.ipc = ipc;
+			this.sockets.push(socket); // Store the socket for later use
 
-            this.sockets.push(socket); // Store the socket for later use
+			switch (data.eventName) {
+				case COV_EVENTS_NAMES.subscribe:
+					await this._subscribeToList(data.data, socket);
+					break;
 
-            switch (data.eventName) {
-                case COV_EVENTS_NAMES.subscribe:
-                    await this._subscribeToList(data.data, socket);
-                    break;
+				case COV_EVENTS_NAMES.unsubscribe:
+					await this._unsubscribeFromList(data.data, socket);
+					break;
 
-                case COV_EVENTS_NAMES.unsubscribe:
-                    await this._unsubscribeFromList(data.data, socket);
-                    break;
+				// case COV_EVENTS_NAMES.subscribed:
+				//     console.log("[COV] - Subscribed to", result.key);
+				//     break;
 
-                // case COV_EVENTS_NAMES.subscribed:
-                //     console.log("[COV] - Subscribed to", result.key);
-                //     break;
+				// case COV_EVENTS_NAMES.error:
+				//     console.error(`[COV] - Failed  due to", "${result.error?.message}"`);
+				//     break;
 
-                // case COV_EVENTS_NAMES.error:
-                //     console.error(`[COV] - Failed  due to", "${result.error?.message}"`);
-                //     break;
+				// case COV_EVENTS_NAMES.changed:
+				//     console.log("[COV] - Change detected for", result.key, "with data:", result.data);
+				//     break;
+			}
+		});
+	}
 
-                // case COV_EVENTS_NAMES.changed:
-                //     console.log("[COV] - Change detected for", result.key, "with data:", result.data);
-                //     break;
-            }
+	private async _subscribeToList(data: any, socket?: net.Socket) {
+		for (const d of data) {
+			await this._subscribe(d, socket);
+		}
+	}
 
-        });
-    }
+	private async _unsubscribeFromList(data: any, socket?: net.Socket) {
+		for (const d of data) {
+			await this._unsubscribe(d, socket);
+		}
+	}
 
-    private async _subscribeToList(data: any, socket?: any) {
-        for (const d of data) {
-            await this._subscribe(d, socket);
-        }
-    }
+	private async _subscribe(data: ICovSubscribeReq, socket?: net.Socket) {
+		const client = await BacnetUtilities.getClient();
+		this._listenChangeEvent(client);
 
-    private async _unsubscribeFromList(data: any, socket?: any) {
-        for (const d of data) {
-            await this._unsubscribe(d, socket);
-        }
-    }
+		const key = `${data.ip}_${data.object.type}_${data.object.instance}`;
+		this._addSocketToMonitoredKey(key, socket); // add the socket to the monitored key map so that we can send events to it later
 
-    private async _subscribe(data: ICovSubscribeReq, socket?: any) {
+		return this._sendSubscribeRequestToBacnet(client, data.ip, data.object)
+			.then(() => {
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.subscribed }, socket); // Notify the client that subscription was successful
+			})
+			.catch((error) => {
+				// If subscription fails, prevent the socket from receiving further events
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, error: { message: (error as Error).message } }, socket);
+			});
+	}
 
-        const client = await BacnetUtilities.getClient();
-        const key = `${data.ip}_${data.object.type}_${data.object.instance}`;
+	private _addSocketToMonitoredKey(key: string, socket?: net.Socket) {
+		if (!this.monitoredToSocketMap.has(key)) {
+			this.monitoredToSocketMap.set(key, []);
+		}
 
-        this._listenChangeEvent(client);
+		if (socket) this.monitoredToSocketMap.get(key)?.push(socket);
+	}
 
+	private async _unsubscribe(data: ICovSubscribeReq, socket?: net.Socket) {
+		const client = await BacnetUtilities.getClient();
+		const key = `${data.ip}_${data.object.type}_${data.object.instance}`;
 
-        try {
-            await this._subscribeProperty(client, data.ip, data.object);
-            this._sendEvent({ key, eventName: COV_EVENTS_NAMES.subscribed }, socket);
-        } catch (error) {
-            this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, error: { message: (error as Error).message } }, socket);
-        }
-    }
+		return this._sendSubscribeRequestToBacnet(client, data.ip, data.object, true)
+			.then(() => {
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.unsubscribed }, socket);
+			})
+			.catch((error) => {
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, error: { message: (error as Error).message } }, socket);
+			});
+	}
 
-    private async _unsubscribe(data: ICovSubscribeReq, socket?: any) {
+	private _sendSubscribeRequestToBacnet(client: bacnet, ip: string, object: IObjectId, cancel = false) {
+		return new Promise((resolve, reject) => {
+			try {
+				const subscribe_id = `${ip}_${object.type}_${object.instance}`;
 
-        const client = await BacnetUtilities.getClient();
-        const key = `${data.ip}_${data.object.type}_${data.object.instance}`;
-        try {
-            const cancel = true;
-            await this._subscribeProperty(client, data.ip, data.object, cancel);
-            this._sendEvent({ key, eventName: COV_EVENTS_NAMES.unsubscribed }, socket);
-        } catch (error) {
-            this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, error: { message: (error as Error).message } }, socket);
-        }
-    }
+				client.subscribeCOV(ip, object, subscribe_id, cancel, false, 0, (err: Error, value: any) => {
+					if (err) return reject(err);
+					resolve(subscribe_id);
+				});
+			} catch (error) {
+				return reject(error);
+			}
+		});
+	}
 
+	private _listenChangeEvent(client: bacnet) {
+		if (client.listenerCount("covNotifyUnconfirmed") > 0) return; // already listening
 
-    private _subscribeProperty(client: bacnet, ip: string, object: IObjectId, cancel = false) {
+		client.on("covNotifyUnconfirmed", (data: any) => {
+			this._sendEvent({ key: data.address, eventName: COV_EVENTS_NAMES.changed, data });
+		});
+	}
 
-        return new Promise((resolve, reject) => {
-            try {
-                const subscribe_id = `${ip}_${object.type}_${object.instance}`;
+	private _sendEvent(data: EventPayload, socket?: net.Socket) {
+		// process.send(data);
+		// eventEmitter.emit("message", data);
+		const socketsToSend = socket ? [socket] : this.monitoredToSocketMap.get(data.key || "") || [];
 
-                client.subscribeCOV(ip, object, subscribe_id, cancel, false, 0, (err: Error, value: any) => {
-                    if (err) return reject(err);
-                    resolve(subscribe_id);
-                });
-
-            } catch (error) {
-                return reject(error);
-            }
-
-        });
-
-    }
-
-    private _listenChangeEvent(client: bacnet) {
-        if (client.listenerCount("covNotifyUnconfirmed") > 0) return; // already listening
-
-        client.on("covNotifyUnconfirmed", (data: any) => {
-            this._sendEvent({ key: data.address, eventName: COV_EVENTS_NAMES.changed, data });
-        });
-
-    }
-
-    private _sendEvent(data: EventPayload, socket?: any) {
-        // process.send(data);
-        // eventEmitter.emit("message", data);
-        const socketsToSend = socket ? [socket] : this.sockets;
-
-        for (const socket of socketsToSend) {
-            this.ipc.server.emit(socket, BACNET_COV_EVENT_NAME, data);
-        }
-
-    }
+		for (const socket of socketsToSend) {
+			console.log(`[COV] - ${data.key} changed - sending event to ${socket["socketId"]}`);
+			this.ipc.server.emit(socket, BACNET_COV_EVENT_NAME, data);
+		}
+	}
 }
-

@@ -1,23 +1,22 @@
 import { COV_EVENTS_NAMES } from "../utils/constants";
 import { ICovData } from "./ICovObj";
 
-
-
 export interface IBacnetRequest {
-    name: string;
-    id: string;
-    parameters: any[];
+	name: string;
+	id: string;
+	parameters: any[];
+	_clientId?: string;
+	timestamp?: number;
 }
 
-
 export interface IBacnetResponse {
-    status: "success" | "error";
-    data?: any;
-    error?: string;
+	status: "success" | "error";
+	data?: any;
+	error?: string;
 }
 
 export interface IBacnetCovRequest {
-    name: keyof typeof COV_EVENTS_NAMES;
-    id: string;
-    parameters?: ICovData;
+	name: keyof typeof COV_EVENTS_NAMES;
+	id: string;
+	parameters?: ICovData;
 }
