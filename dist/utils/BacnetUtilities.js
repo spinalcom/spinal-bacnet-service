@@ -260,7 +260,8 @@ class BacnetUtilitiesClass extends node_events_1.default {
                         objectListDetails.push(res);
                     }
                     catch (err) {
-                        if (deviceAcceptSegmentation) {
+                        const deviceAvailable = yield this.deviceIsAvailable(device);
+                        if (deviceAcceptSegmentation && deviceAvailable) {
                             const itemsFound = yield this._retryGetObjectDetailWithReadProperty(object, device);
                             if (itemsFound.length > 0)
                                 objectListDetails.push(itemsFound);
@@ -271,6 +272,17 @@ class BacnetUtilitiesClass extends node_events_1.default {
             if (deviceAcceptSegmentation)
                 objectListDetails = lodash.flattenDeep(objectListDetails);
             return objectListDetails;
+        });
+    }
+    deviceIsAvailable(device) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield this.readProperty(device.address, device.SADR, { instance: device.deviceId, type: 8 }, GlobalVariables_1.PropertyIds.PROP_OBJECT_NAME);
+                return true;
+            }
+            catch (error) {
+                return false;
+            }
         });
     }
     _retryGetObjectDetailWithReadProperty(items, device) {

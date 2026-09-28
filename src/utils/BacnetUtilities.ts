@@ -230,7 +230,8 @@ class BacnetUtilitiesClass extends EventEmitter {
 					const res = await callbackFunc.call(this, device, object);
 					objectListDetails.push(res);
 				} catch (err) {
-					if (deviceAcceptSegmentation) {
+					const deviceAvailable = await this.deviceIsAvailable(device);
+					if (deviceAcceptSegmentation && deviceAvailable) {
 						const itemsFound = await this._retryGetObjectDetailWithReadProperty(object, device);
 						if (itemsFound.length > 0) objectListDetails.push(itemsFound);
 					}
@@ -241,6 +242,15 @@ class BacnetUtilitiesClass extends EventEmitter {
 		if (deviceAcceptSegmentation) objectListDetails = lodash.flattenDeep(objectListDetails as any[]);
 
 		return objectListDetails;
+	}
+
+	public async deviceIsAvailable(device: IDevice): Promise<boolean> {
+		try {
+			await this.readProperty(device.address!, device.SADR, { instance: device.deviceId, type: 8 }, PropertyIds.PROP_OBJECT_NAME);
+			return true;
+		} catch (error) {
+			return false;
+		}
 	}
 
 	private async _retryGetObjectDetailWithReadProperty(items: any, device: IDevice): Promise<any> {
