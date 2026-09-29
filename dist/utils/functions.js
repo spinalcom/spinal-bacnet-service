@@ -21,13 +21,14 @@ const constants_1 = require("./constants");
 const BacnetUtilities_1 = __importDefault(require("./BacnetUtilities"));
 const cov_1 = require("./cov");
 function launchBacnetService() {
-    return __awaiter(this, arguments, void 0, function* (port = constants_1.DEFAULT_PORT) {
+    return __awaiter(this, arguments, void 0, function* (port = constants_1.DEFAULT_PORT, serviceName = constants_1.SERVICE_NAME) {
         const isAlreadyRunning = yield serverIsRunning(port);
         if (isAlreadyRunning) {
-            console.log(`Bacnet service is already running on port ${port}.`);
-            return false;
+            throw new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
+            // console.log(`Bacnet service is already running on port ${port}.`);
+            // return false;
         }
-        node_ipc_1.default.config.id = constants_1.SERVICE_NAME;
+        node_ipc_1.default.config.id = serviceName;
         node_ipc_1.default.config.retry = constants_1.IPC_RETRY_INTERVAL;
         node_ipc_1.default.config.silent = true; // Disable IPC logging
         node_ipc_1.default.serveNet("127.0.0.1", port, () => {

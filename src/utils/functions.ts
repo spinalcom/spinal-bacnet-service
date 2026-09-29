@@ -8,14 +8,15 @@ import { IValidValue } from "../Interfaces/IValidValue";
 
 type NodeIpc = typeof ipc;
 
-export async function launchBacnetService(port = DEFAULT_PORT): Promise<boolean> {
+export async function launchBacnetService(port = DEFAULT_PORT, serviceName: string = SERVICE_NAME): Promise<boolean> {
 	const isAlreadyRunning = await serverIsRunning(port);
 	if (isAlreadyRunning) {
-		console.log(`Bacnet service is already running on port ${port}.`);
-		return false;
+		throw new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
+		// console.log(`Bacnet service is already running on port ${port}.`);
+		// return false;
 	}
 
-	ipc.config.id = SERVICE_NAME;
+	ipc.config.id = serviceName;
 	ipc.config.retry = IPC_RETRY_INTERVAL;
 	ipc.config.silent = true; // Disable IPC logging
 
