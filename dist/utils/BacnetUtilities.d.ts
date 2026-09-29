@@ -1,6 +1,6 @@
 import bacnet from "bacstack";
 import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty, IWriteRequest } from "../Interfaces";
-import EventEmitter from "node:events";
+import { EventEmitter } from "node:events";
 declare class BacnetUtilitiesClass extends EventEmitter {
     private static instance;
     private _client;

@@ -73,10 +73,10 @@ const lodash = __importStar(require("lodash"));
 const bacstack_1 = __importDefault(require("bacstack"));
 const GlobalVariables_1 = require("./GlobalVariables");
 const GlobalVariables_2 = require("./GlobalVariables");
-const node_events_1 = __importDefault(require("node:events"));
+const node_events_1 = require("node:events");
 const constants_1 = require("./constants");
 const functions_1 = require("./functions");
-class BacnetUtilitiesClass extends node_events_1.default {
+class BacnetUtilitiesClass extends node_events_1.EventEmitter {
     constructor() {
         super();
         this._client = null;

@@ -27,7 +27,7 @@ import bacnet from "bacstack";
 import { ObjectTypes, PropertyIds, PropertyNames, ObjectTypesCode, UNITS_TYPES, APPLICATION_TAGS } from "./GlobalVariables";
 import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty, ICovData, IWriteRequest } from "../Interfaces";
 import { SEGMENTATIONS } from "./GlobalVariables";
-import EventEmitter from "node:events";
+import { EventEmitter } from "node:events";
 import { CLIENT_RESET_EVENT } from "./constants";
 import { isValidValue, isValidValueArray } from "./functions";
 
