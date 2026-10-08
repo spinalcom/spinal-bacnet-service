@@ -16,29 +16,41 @@ exports.launchBacnetService = launchBacnetService;
 exports.isValidValue = isValidValue;
 exports.isValidValueArray = isValidValueArray;
 exports.sendBroadcast = sendBroadcast;
-const net_1 = __importDefault(require("net"));
 const node_ipc_1 = __importDefault(require("node-ipc"));
 const constants_1 = require("./constants");
 const BacnetUtilities_1 = __importDefault(require("./BacnetUtilities"));
 const cov_1 = require("./cov");
+const { exec } = require("child_process");
+function convertToNumber(value) {
+    const numberValue = Number(value);
+    if (isNaN(numberValue)) {
+        throw new Error(`Invalid port number: ${value}`);
+    }
+    return numberValue;
+}
 function launchBacnetService() {
     return __awaiter(this, arguments, void 0, function* (port = constants_1.DEFAULT_PORT, serviceName = constants_1.SERVICE_NAME) {
-        const isAlreadyRunning = yield serverIsRunning(port);
-        if (isAlreadyRunning) {
-            throw new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
-            // console.log(`Bacnet service is already running on port ${port}.`);
-            // return false;
-        }
-        node_ipc_1.default.config.id = serviceName;
-        node_ipc_1.default.config.retry = constants_1.IPC_RETRY_INTERVAL;
-        node_ipc_1.default.config.silent = true; // Disable IPC logging
-        node_ipc_1.default.serveNet("127.0.0.1", port, () => {
-            node_ipc_1.default.server.on(constants_1.MESSAGE_EVENT_NAME, (data, socket) => __awaiter(this, void 0, void 0, function* () { return listenBacnetEvents(node_ipc_1.default, data, socket); }));
-            node_ipc_1.default.server.on(constants_1.COV_EVENT_NAME, (data, socket) => __awaiter(this, void 0, void 0, function* () { return listenBacnetCovEvents(node_ipc_1.default, data, socket); }));
-            console.log(`Bacnet service is listening on port ${port}...`);
-        });
-        node_ipc_1.default.server.start();
-        return true;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            port = convertToNumber(port);
+            const isAlreadyRunning = yield serverIsRunning(port);
+            if (isAlreadyRunning) {
+                const err = new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
+                return reject(err);
+                // console.log(`Bacnet service is already running on port ${port}.`);
+                // return false;
+            }
+            node_ipc_1.default.config.id = serviceName;
+            node_ipc_1.default.config.retry = constants_1.IPC_RETRY_INTERVAL;
+            node_ipc_1.default.config.silent = true; // Disable IPC logging
+            node_ipc_1.default.serveNet("127.0.0.1", port, () => {
+                node_ipc_1.default.server.on(constants_1.MESSAGE_EVENT_NAME, (data, socket) => __awaiter(this, void 0, void 0, function* () { return listenBacnetEvents(node_ipc_1.default, data, socket); }));
+                node_ipc_1.default.server.on(constants_1.COV_EVENT_NAME, (data, socket) => __awaiter(this, void 0, void 0, function* () { return listenBacnetCovEvents(node_ipc_1.default, data, socket); }));
+                console.log(`Bacnet service is listening on port ${port}...`);
+                resolve(true);
+            });
+            node_ipc_1.default.server.start();
+            // return true;
+        }));
     });
 }
 function listenBacnetEvents(ipc, data, socket) {
@@ -78,28 +90,28 @@ function handleBacnetRequest(data) {
         }
     });
 }
-function serverIsRunning(port) {
-    return new Promise((resolve, reject) => {
-        const socket = new net_1.default.Socket();
-        const cleanup = () => {
-            socket.removeAllListeners();
-            socket.destroy();
-        };
-        socket.once("connect", () => {
-            cleanup();
-            resolve(true);
-        });
-        socket.once("error", () => {
-            cleanup();
-            resolve(false);
-        });
-        socket.once("timeout", () => {
-            cleanup();
-            resolve(false);
-        });
-        socket.connect(port, "127.0.0.1");
-    });
-}
+// function serverIsRunning(port: number): Promise<boolean> {
+// 	return new Promise((resolve, reject) => {
+// 		const socket = new net.Socket();
+// 		const cleanup = () => {
+// 			socket.removeAllListeners();
+// 			socket.destroy();
+// 		};
+// 		socket.once("connect", () => {
+// 			cleanup();
+// 			resolve(true);
+// 		});
+// 		socket.once("error", () => {
+// 			cleanup();
+// 			resolve(false);
+// 		});
+// 		socket.once("timeout", () => {
+// 			cleanup();
+// 			resolve(false);
+// 		});
+// 		socket.connect(port, "127.0.0.1");
+// 	});
+// }
 function isValidValue(value) {
     return value && typeof value === "object" && "type" in value && "value" in value;
 }
@@ -108,5 +120,34 @@ function isValidValueArray(arr) {
 }
 function sendBroadcast(ipc, eventName, data) {
     ipc.server.broadcast(eventName, data);
+}
+function serverIsRunning(port) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            // Find process using the port
+            const { stdout } = yield execPromise(`lsof -i:${port} -t -sTCP:LISTEN`);
+            const pid = stdout.trim();
+            if (!pid) {
+                return false; // Port is free
+            }
+            return true; // Port is in use
+        }
+        catch (err) {
+            // lsof returns error if port is free - this is normal
+            return false;
+        }
+    });
+}
+function execPromise(command) {
+    return new Promise((resolve, reject) => {
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                reject(error);
+            }
+            else {
+                resolve({ stdout, stderr });
+            }
+        });
+    });
 }
 //# sourceMappingURL=functions.js.map

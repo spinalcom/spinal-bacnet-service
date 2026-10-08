@@ -5,29 +5,44 @@ import { IBacnetRequest, IBacnetResponse } from "../Interfaces/IBacnetRequest";
 import BacnetUtilities from "./BacnetUtilities";
 import { EventPayload, SpinalCov } from "./cov";
 import { IValidValue } from "../Interfaces/IValidValue";
+const { exec } = require("child_process");
+
+function convertToNumber(value: any): number {
+	const numberValue = Number(value);
+	if (isNaN(numberValue)) {
+		throw new Error(`Invalid port number: ${value}`);
+	}
+	return numberValue;
+}
 
 type NodeIpc = typeof ipc;
 
 export async function launchBacnetService(port = DEFAULT_PORT, serviceName: string = SERVICE_NAME): Promise<boolean> {
-	const isAlreadyRunning = await serverIsRunning(port);
-	if (isAlreadyRunning) {
-		throw new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
-		// console.log(`Bacnet service is already running on port ${port}.`);
-		// return false;
-	}
+	return new Promise(async (resolve, reject) => {
+		port = convertToNumber(port);
 
-	ipc.config.id = serviceName;
-	ipc.config.retry = IPC_RETRY_INTERVAL;
-	ipc.config.silent = true; // Disable IPC logging
+		const isAlreadyRunning = await serverIsRunning(port);
+		if (isAlreadyRunning) {
+			const err = new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
+			return reject(err);
+			// console.log(`Bacnet service is already running on port ${port}.`);
+			// return false;
+		}
 
-	ipc.serveNet("127.0.0.1", port, () => {
-		ipc.server.on(MESSAGE_EVENT_NAME, async (data, socket) => listenBacnetEvents(ipc, data, socket));
-		ipc.server.on(COV_EVENT_NAME, async (data, socket) => listenBacnetCovEvents(ipc, data, socket));
-		console.log(`Bacnet service is listening on port ${port}...`);
+		ipc.config.id = serviceName;
+		ipc.config.retry = IPC_RETRY_INTERVAL;
+		ipc.config.silent = true; // Disable IPC logging
+
+		ipc.serveNet("127.0.0.1", port, () => {
+			ipc.server.on(MESSAGE_EVENT_NAME, async (data, socket) => listenBacnetEvents(ipc, data, socket));
+			ipc.server.on(COV_EVENT_NAME, async (data, socket) => listenBacnetCovEvents(ipc, data, socket));
+			console.log(`Bacnet service is listening on port ${port}...`);
+			resolve(true);
+		});
+
+		ipc.server.start();
+		// return true;
 	});
-
-	ipc.server.start();
-	return true;
 }
 
 async function listenBacnetEvents(ipc: NodeIpc, data: IBacnetRequest, socket: net.Socket): Promise<void> {
@@ -65,33 +80,33 @@ async function handleBacnetRequest(data: IBacnetRequest): Promise<IBacnetRespons
 	}
 }
 
-function serverIsRunning(port: number): Promise<boolean> {
-	return new Promise((resolve, reject) => {
-		const socket = new net.Socket();
+// function serverIsRunning(port: number): Promise<boolean> {
+// 	return new Promise((resolve, reject) => {
+// 		const socket = new net.Socket();
 
-		const cleanup = () => {
-			socket.removeAllListeners();
-			socket.destroy();
-		};
+// 		const cleanup = () => {
+// 			socket.removeAllListeners();
+// 			socket.destroy();
+// 		};
 
-		socket.once("connect", () => {
-			cleanup();
-			resolve(true);
-		});
+// 		socket.once("connect", () => {
+// 			cleanup();
+// 			resolve(true);
+// 		});
 
-		socket.once("error", () => {
-			cleanup();
-			resolve(false);
-		});
+// 		socket.once("error", () => {
+// 			cleanup();
+// 			resolve(false);
+// 		});
 
-		socket.once("timeout", () => {
-			cleanup();
-			resolve(false);
-		});
+// 		socket.once("timeout", () => {
+// 			cleanup();
+// 			resolve(false);
+// 		});
 
-		socket.connect(port, "127.0.0.1");
-	});
-}
+// 		socket.connect(port, "127.0.0.1");
+// 	});
+// }
 
 export function isValidValue(value: any): value is IValidValue {
 	return value && typeof value === "object" && "type" in value && "value" in value;
@@ -103,4 +118,33 @@ export function isValidValueArray(arr: any): arr is IValidValue[] {
 
 export function sendBroadcast(ipc: NodeIpc, eventName: string, data?: any): void {
 	ipc.server.broadcast(eventName, data);
+}
+
+async function serverIsRunning(port: number): Promise<boolean> {
+	try {
+		// Find process using the port
+		const { stdout } = await execPromise(`lsof -i:${port} -t -sTCP:LISTEN`);
+		const pid = stdout.trim();
+
+		if (!pid) {
+			return false; // Port is free
+		}
+
+		return true; // Port is in use
+	} catch (err) {
+		// lsof returns error if port is free - this is normal
+		return false;
+	}
+}
+
+function execPromise(command: string): Promise<{ stdout: string; stderr: string }> {
+	return new Promise((resolve, reject) => {
+		exec(command, (error, stdout, stderr) => {
+			if (error) {
+				reject(error);
+			} else {
+				resolve({ stdout, stderr });
+			}
+		});
+	});
 }
