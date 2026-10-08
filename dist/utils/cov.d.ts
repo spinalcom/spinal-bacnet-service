@@ -14,6 +14,7 @@ export declare class SpinalCov extends EventEmitter {
     private static instance;
     private ipc;
     monitoredToSocketMap: Map<string, net.Socket[]>;
+    private monitoredSubscriptions;
     private sockets;
     private constructor();
     static getInstance(): SpinalCov;
@@ -23,6 +24,9 @@ export declare class SpinalCov extends EventEmitter {
     private _subscribe;
     private _addSocketToMonitoredKey;
     private _unsubscribe;
+    private _removeSocketFromMonitoredKey;
+    private _listenClientReset;
+    private _resubscribeToCovItems;
     private _sendSubscribeRequestToBacnet;
     private _listenChangeEvent;
     private _sendEvent;

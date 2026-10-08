@@ -37,6 +37,11 @@ async function listenBacnetEvents(ipc: NodeIpc, data: IBacnetRequest, socket: ne
 	const result = await handleBacnetRequest(data);
 	ipc.server.emit(socket, `${RESPONSE_EVENT_NAME}_${id}`, result);
 	console.log(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
+
+	if (result.data.isReset) {
+		console.log(`[INFO] - Bacnet client reseted`);
+		// sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
+	}
 }
 
 async function listenBacnetCovEvents(ipc: NodeIpc, data: EventPayload, socket: net.Socket): Promise<void> {
@@ -51,7 +56,6 @@ async function handleBacnetRequest(data: IBacnetRequest): Promise<IBacnetRespons
 	try {
 		const { name, parameters } = data;
 		const functionExists = (BacnetUtilities as any)[name] && typeof (BacnetUtilities as any)[name] === "function";
-
 		if (!functionExists) throw new Error(`Bacnet utility function ${name} not found.`);
 
 		const res = await (BacnetUtilities as any)[name](...parameters);
@@ -95,4 +99,8 @@ export function isValidValue(value: any): value is IValidValue {
 
 export function isValidValueArray(arr: any): arr is IValidValue[] {
 	return Array.isArray(arr) && arr.every(isValidValue);
+}
+
+export function sendBroadcast(ipc: NodeIpc, eventName: string, data?: any): void {
+	ipc.server.broadcast(eventName, data);
 }

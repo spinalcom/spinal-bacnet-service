@@ -39,46 +39,21 @@ class BacnetUtilitiesClass extends EventEmitter {
 		super();
 	}
 
-	private clientState = {
-		// failed: { count: 0, time: null },
-		// success: { count: 0, time: null },
-		consecutiveFailures: 0,
-	};
-
 	public static getInstance(): BacnetUtilitiesClass {
 		if (!this.instance) this.instance = new BacnetUtilitiesClass();
 		return this.instance;
 	}
 
 	public createNewBacnetClient(): bacnet {
-		const client = new bacnet();
+		const client = new bacnet({ apduTimeout: 1000 });
 		this._listenClientErrorEvent(client);
 		return client;
 	}
 
-	public getClient(): Promise<bacnet> {
-		return new Promise((resolve) => {
-			if (!this._client) this._client = this.createNewBacnetClient();
+	public getClient(): bacnet {
+		if (!this._client) this._client = this.createNewBacnetClient();
 
-			return resolve(this._client);
-		});
-	}
-
-	public incrementState(state: "failed" | "success") {
-		if (state === "failed") {
-			this.clientState.consecutiveFailures++;
-
-			// reset client if consecutive failures
-			if (this.clientState.consecutiveFailures >= 5) {
-				this._client = null; // reset client after 5 consecutive failures;
-
-				this.emit(CLIENT_RESET_EVENT);
-
-				this.clientState.consecutiveFailures = 0;
-			}
-		} else {
-			this.clientState.consecutiveFailures = 0;
-		}
+		return this._client;
 	}
 
 	private _listenClientErrorEvent(client: bacnet): void {
@@ -98,6 +73,14 @@ class BacnetUtilitiesClass extends EventEmitter {
 		});
 	}
 
+	public resetClient() {
+		this._client = null;
+		this._client = this.createNewBacnetClient();
+		this.emit(CLIENT_RESET_EVENT, this._client);
+
+		return this._client;
+	}
+
 	////////////////////////////////////////////////////////////////
 	////                  READ BACNET DATA                        //
 	////////////////////////////////////////////////////////////////
@@ -105,18 +88,16 @@ class BacnetUtilitiesClass extends EventEmitter {
 	public readPropertyMultiple(address: string, sadr: any, requestArray: IRequestArray | IRequestArray[]): Promise<IReadPropertyMultiple> {
 		return new Promise(async (resolve, reject) => {
 			try {
-				const client = await this.getClient();
+				const client = this.getClient();
 				requestArray = Array.isArray(requestArray) ? requestArray : [requestArray];
 				if (sadr && typeof sadr == "object") sadr = Object.keys(sadr).length === 0 ? null : sadr;
 
 				client.readPropertyMultiple(address, sadr, requestArray, (err: Error, data: any) => {
 					if (err) {
-						// this.incrementState("failed");
 						reject(err);
 						return;
 					}
 
-					this.incrementState("success");
 					resolve(data);
 				});
 			} catch (error) {
@@ -126,18 +107,16 @@ class BacnetUtilitiesClass extends EventEmitter {
 	}
 
 	public async readProperty(address: string, sadr: any, objectId: IObjectId, propertyId: number | string, clientOptions?: any): Promise<IReadProperty> {
-		const client = await this.getClient();
+		const client = this.getClient();
 		const options = clientOptions || {};
 		if (sadr && typeof sadr == "object") sadr = Object.keys(sadr).length === 0 ? null : sadr;
 
 		return new Promise((resolve, reject) => {
 			client.readProperty(address, sadr, objectId, propertyId, options, (err: Error, data: any) => {
 				if (err) {
-					// this.incrementState("failed");
 					return reject(err);
 				}
 
-				this.incrementState("success");
 				resolve(data);
 			});
 		});
@@ -161,7 +140,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 			if (deviceAcceptSegmentation) {
 				const params = [{ objectId: objectId, properties: [{ id: PropertyIds.PROP_OBJECT_LIST }] }];
 				let data = await this.readPropertyMultiple(deviceAddress, device.SADR, params);
-				const dataFormatted = data.values.map((el) => el.values.map((el2) => el2.value));
+				const dataFormatted = data.values.map((el) => el.values.map((el2) => this._formatCurrentValue(el2.value, el.objectId.type)));
 				values = lodash.flattenDeep(dataFormatted);
 			} else {
 				let data = await this.readProperty(deviceAddress, device.SADR, objectId, PropertyIds.PROP_OBJECT_LIST);
@@ -169,7 +148,8 @@ class BacnetUtilitiesClass extends EventEmitter {
 			}
 		} catch (error: any) {
 			// error reason:4 means that the device does not support segmentation or the response is too big, so we can retry with fragment method
-			if (error.message.match(/reason:4/i) || error.message.match(/err_timeout/i)) values = await this.getItemListByFragment(device, objectId);
+			if (error?.message?.match(/reason:4/i) || error?.message?.match(/err_timeout/i)) values = await this.getItemListByFragment(device, objectId);
+			else throw error;
 		}
 
 		// If values is still undefined or empty after trying both methods, throw an error
@@ -180,31 +160,33 @@ class BacnetUtilitiesClass extends EventEmitter {
 
 	public async getItemListByFragment(device: IDevice, objectId: IObjectId): Promise<IObjectId[]> {
 		const bacnetItemsFound: IObjectId[] = [];
-		let error: Error;
 		let index = 1;
 		let finish = false;
 
 		const deviceAddress = device.address;
 		if (!deviceAddress) throw new Error("Device address is required");
 
-		return new Promise(async (resolve) => {
-			while (!error && !finish) {
-				try {
-					const clientOptions = { arrayIndex: index };
-					const value = await this.readProperty(deviceAddress, device.SADR, objectId, PropertyIds.PROP_OBJECT_LIST, clientOptions);
-					if (value) {
-						index++;
-						bacnetItemsFound.push(...(value.values as any[]));
-					} else {
-						finish = true;
-					}
-				} catch (err: any) {
-					error = err;
+		while (!finish) {
+			try {
+				const clientOptions = { arrayIndex: index };
+				const value = await this.readProperty(deviceAddress, device.SADR, objectId, PropertyIds.PROP_OBJECT_LIST, clientOptions);
+				if (value) {
+					index++;
+					bacnetItemsFound.push(...(value.values as any[]));
+				} else {
+					finish = true;
 				}
-			}
+			} catch (err: any) {
+				if (bacnetItemsFound.length === 0) {
+					throw err;
+				}
 
-			resolve(bacnetItemsFound);
-		});
+				// Some devices end indexed reads with an error once the last element is reached.
+				finish = true;
+			}
+		}
+
+		return bacnetItemsFound;
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -253,21 +235,20 @@ class BacnetUtilitiesClass extends EventEmitter {
 		}
 	}
 
-	private async _retryGetObjectDetailWithReadProperty(items: any, device: IDevice): Promise<any> {
+	private async _retryGetObjectDetailWithReadProperty(items: IObjectId[], device: IDevice): Promise<any> {
 		const itemsFound: any[] = [];
-		let failedCount = 0;
+		let totalFailedCount = 0;
 
 		for (const item of items) {
 			try {
 				const res = await this._getObjectDetailWithReadProperty(device, item);
 				if (res) itemsFound.push(res);
-				failedCount = 0;
 			} catch (error) {
-				if (failedCount >= 5) throw error; // stop retrying after 5 consecutive failures
+				totalFailedCount++;
 			}
 		}
 
-		if (failedCount == items.length) throw new Error("Failed to get details for all items");
+		if (totalFailedCount === items.length) throw new Error("Failed to get details for all items");
 
 		return itemsFound;
 	}
@@ -407,7 +388,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 						child.id = child.instance;
 						const data = await this.readProperty(deviceAddress, device.SADR, child, PropertyIds.PROP_PRESENT_VALUE);
 						const value = data.values[0]?.value;
-						child.currentValue = this._getObjValue(value);
+						child.currentValue = this._formatCurrentValue(this._getObjValue(value), child.type);
 						res.push(child);
 					} catch (error) {
 						rejectCount++;
@@ -430,6 +411,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 		const types = this._getPossibleDataTypes(request.objectId.type);
 		let success = false;
 		let data = null;
+		let lastError: unknown = null;
 
 		while (types.length > 0 && !success) {
 			const type = types.shift();
@@ -438,25 +420,29 @@ class BacnetUtilitiesClass extends EventEmitter {
 				data = await this._writePropertyWithType(request, type);
 				success = true;
 				if (releasePriority) await this._releasePriority(request, type);
-			} catch (error) {}
+			} catch (error) {
+				lastError = error;
+			}
 		}
 
-		if (!success) throw new Error("Failed to write property with all possible data types");
+		if (!success) {
+			const reason = lastError instanceof Error ? lastError.message : "unknown error";
+			throw new Error(`Failed to write property with all possible data types: ${reason}`);
+		}
 		console.log("success");
 		return data;
 	}
 
 	private async _writePropertyWithType(request: IWriteRequest, dataType: number): Promise<any> {
 		return new Promise(async (resolve, reject) => {
-			const client = await BacnetUtilities.getClient();
+			const client = this.getClient();
 			const valueConverted = this._convertValueToBoolean(request.value) ? 1 : 0;
 			const value = dataType === APPLICATION_TAGS.BACNET_APPLICATION_TAG_ENUMERATED ? valueConverted : request.value;
+			const sadr = !request.SADR || (typeof request.SADR === "object" && Object.keys(request.SADR).length === 0) ? null : request.SADR;
 
 			const priority = this._getBacnetPriority(request);
 
-			if (!request.SADR || (typeof request.SADR === "object" && Object.keys(request.SADR).length === 0)) request.SADR = null;
-
-			client.writeProperty(request.address, request.SADR, request.objectId, PropertyIds.PROP_PRESENT_VALUE, [{ type: dataType, value: value }], { priority }, (err: Error, value: any) => {
+			client.writeProperty(request.address, sadr, request.objectId, PropertyIds.PROP_PRESENT_VALUE, [{ type: dataType, value: value }], { priority }, (err: Error, value: any) => {
 				if (err) {
 					reject(err);
 					return;
@@ -512,7 +498,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 				const propertyName = this._getPropertyNameByCode(argId);
 
 				if (propertyName) {
-					obj[propertyName] = this._getObjValue(value);
+					obj[propertyName] = this._formatCurrentValue(this._getObjValue(value), property?.type);
 				}
 			}
 
@@ -541,9 +527,11 @@ class BacnetUtilitiesClass extends EventEmitter {
 	}
 
 	public _formatCurrentValue(value: any, type: number | string): boolean | string | number {
-		if ([ObjectTypes.OBJECT_BINARY_INPUT, ObjectTypes.OBJECT_BINARY_VALUE].indexOf(type) !== -1) {
+		if ([ObjectTypes.OBJECT_BINARY_INPUT, ObjectTypes.OBJECT_BINARY_OUTPUT, ObjectTypes.OBJECT_BINARY_VALUE, ObjectTypes.OBJECT_BINARY_LIGHTING_OUTPUT].indexOf(type) !== -1) {
 			return value ? true : false;
 		}
+
+		if (typeof value === "object" && "errorClass" in value && "errorCode" in value) return "";
 
 		return value;
 	}

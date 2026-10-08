@@ -9,7 +9,9 @@
 		"sourceMap": true,
 		"declaration": true,
 		"resolveJsonModule": true,
-		"noImplicitAny": false
+		"noImplicitAny": false,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true
 	},
 	"include": ["src"]
 }

@@ -20,8 +20,10 @@ class SpinalCov extends stream_1.EventEmitter {
     constructor() {
         super();
         this.monitoredToSocketMap = new Map();
+        this.monitoredSubscriptions = new Map();
         this.sockets = [];
         this._listenEventMessage();
+        this._listenClientReset();
     }
     static getInstance() {
         if (!this.instance) {
@@ -69,10 +71,11 @@ class SpinalCov extends stream_1.EventEmitter {
     }
     _subscribe(data, socket) {
         return __awaiter(this, void 0, void 0, function* () {
-            const client = yield BacnetUtilities_1.default.getClient();
+            const client = BacnetUtilities_1.default.getClient();
             this._listenChangeEvent(client);
             const key = `${data.ip}_${data.object.type}_${data.object.instance}`;
             this._addSocketToMonitoredKey(key, socket); // add the socket to the monitored key map so that we can send events to it later
+            this.monitoredSubscriptions.set(key, data);
             return this._sendSubscribeRequestToBacnet(client, data.ip, data.object)
                 .then(() => {
                 this._sendEvent({ key, eventName: constants_1.COV_EVENTS_NAMES.subscribed }, socket); // Notify the client that subscription was successful
@@ -93,15 +96,55 @@ class SpinalCov extends stream_1.EventEmitter {
     }
     _unsubscribe(data, socket) {
         return __awaiter(this, void 0, void 0, function* () {
-            const client = yield BacnetUtilities_1.default.getClient();
+            const client = BacnetUtilities_1.default.getClient();
             const key = `${data.ip}_${data.object.type}_${data.object.instance}`;
+            this._removeSocketFromMonitoredKey(key, socket);
             return this._sendSubscribeRequestToBacnet(client, data.ip, data.object, true)
                 .then(() => {
+                if (!this.monitoredToSocketMap.has(key))
+                    this.monitoredSubscriptions.delete(key);
                 this._sendEvent({ key, eventName: constants_1.COV_EVENTS_NAMES.unsubscribed }, socket);
             })
                 .catch((error) => {
                 this._sendEvent({ key, eventName: constants_1.COV_EVENTS_NAMES.error, error: { message: error.message } }, socket);
             });
+        });
+    }
+    _removeSocketFromMonitoredKey(key, socket) {
+        const sockets = this.monitoredToSocketMap.get(key);
+        if (!sockets || sockets.length === 0)
+            return;
+        if (!socket) {
+            this.monitoredToSocketMap.delete(key);
+            return;
+        }
+        const filtered = sockets.filter((s) => s !== socket);
+        if (filtered.length === 0)
+            this.monitoredToSocketMap.delete(key);
+        else
+            this.monitoredToSocketMap.set(key, filtered);
+    }
+    _listenClientReset() {
+        BacnetUtilities_1.default.on(constants_1.CLIENT_RESET_EVENT, () => __awaiter(this, void 0, void 0, function* () {
+            yield this._resubscribeToCovItems();
+        }));
+    }
+    _resubscribeToCovItems() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const subscriptions = Array.from(this.monitoredSubscriptions.entries());
+            if (subscriptions.length === 0)
+                return;
+            const client = BacnetUtilities_1.default.getClient();
+            this._listenChangeEvent(client);
+            for (const [key, subscription] of subscriptions) {
+                try {
+                    yield this._sendSubscribeRequestToBacnet(client, subscription.ip, subscription.object);
+                    this._sendEvent({ key, eventName: constants_1.COV_EVENTS_NAMES.subscribed });
+                }
+                catch (error) {
+                    this._sendEvent({ key, eventName: constants_1.COV_EVENTS_NAMES.error, error: { message: error.message } });
+                }
+            }
         });
     }
     _sendSubscribeRequestToBacnet(client, ip, object, cancel = false) {

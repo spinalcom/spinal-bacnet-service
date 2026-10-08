@@ -5,12 +5,11 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     private static instance;
     private _client;
     private constructor();
-    private clientState;
     static getInstance(): BacnetUtilitiesClass;
     createNewBacnetClient(): bacnet;
-    getClient(): Promise<bacnet>;
-    incrementState(state: "failed" | "success"): void;
+    getClient(): bacnet;
     private _listenClientErrorEvent;
+    resetClient(): bacnet;
     readPropertyMultiple(address: string, sadr: any, requestArray: IRequestArray | IRequestArray[]): Promise<IReadPropertyMultiple>;
     readProperty(address: string, sadr: any, objectId: IObjectId, propertyId: number | string, clientOptions?: any): Promise<IReadProperty>;
     _getDeviceObjectList(device: IDevice, SENSOR_TYPES: Array<number>, getListUsingFragment?: boolean): Promise<IObjectId[]>;

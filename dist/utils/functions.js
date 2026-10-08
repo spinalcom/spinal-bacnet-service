@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.launchBacnetService = launchBacnetService;
 exports.isValidValue = isValidValue;
 exports.isValidValueArray = isValidValueArray;
+exports.sendBroadcast = sendBroadcast;
 const net_1 = __importDefault(require("net"));
 const node_ipc_1 = __importDefault(require("node-ipc"));
 const constants_1 = require("./constants");
@@ -48,6 +49,10 @@ function listenBacnetEvents(ipc, data, socket) {
         const result = yield handleBacnetRequest(data);
         ipc.server.emit(socket, `${constants_1.RESPONSE_EVENT_NAME}_${id}`, result);
         console.log(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
+        if (result.data.isReset) {
+            console.log(`[INFO] - Bacnet client reseted`);
+            // sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
+        }
     });
 }
 function listenBacnetCovEvents(ipc, data, socket) {
@@ -100,5 +105,8 @@ function isValidValue(value) {
 }
 function isValidValueArray(arr) {
     return Array.isArray(arr) && arr.every(isValidValue);
+}
+function sendBroadcast(ipc, eventName, data) {
+    ipc.server.broadcast(eventName, data);
 }
 //# sourceMappingURL=functions.js.map
