@@ -1,6 +1,7 @@
 import bacnet from "bacstack";
 import { IDevice, IObjectId, IReadPropertyMultiple, IRequestArray, IReadProperty, IWriteRequest } from "../Interfaces";
 import { EventEmitter } from "node:events";
+import { CLIENT_RESET_EVENT } from "./constants";
 declare class BacnetUtilitiesClass extends EventEmitter {
     private static instance;
     private _client;
@@ -9,7 +10,7 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     createNewBacnetClient(): bacnet;
     getClient(): bacnet;
     private _listenClientErrorEvent;
-    resetClient(): bacnet;
+    [CLIENT_RESET_EVENT](): bacnet;
     readPropertyMultiple(address: string, sadr: any, requestArray: IRequestArray | IRequestArray[]): Promise<IReadPropertyMultiple>;
     readProperty(address: string, sadr: any, objectId: IObjectId, propertyId: number | string, clientOptions?: any): Promise<IReadProperty>;
     _getDeviceObjectList(device: IDevice, SENSOR_TYPES: Array<number>, getListUsingFragment?: boolean): Promise<IObjectId[]>;

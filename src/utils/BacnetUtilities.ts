@@ -73,7 +73,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 		});
 	}
 
-	public resetClient() {
+	public [CLIENT_RESET_EVENT]() {
 		this._client = null;
 		this._client = this.createNewBacnetClient();
 		this.emit(CLIENT_RESET_EVENT, this._client);
