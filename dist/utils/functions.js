@@ -61,10 +61,10 @@ function listenBacnetEvents(ipc, data, socket) {
         const result = yield handleBacnetRequest(data);
         ipc.server.emit(socket, `${constants_1.RESPONSE_EVENT_NAME}_${id}`, result);
         console.log(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
-        if (result.data.isReset) {
-            console.log(`[INFO] - Bacnet client reseted`);
-            // sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
-        }
+        // if (result.data.isReset) {
+        // 	console.log(`[INFO] - Bacnet client reseted`);
+        // 	// sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
+        // }
     });
 }
 function listenBacnetCovEvents(ipc, data, socket) {

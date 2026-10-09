@@ -53,10 +53,10 @@ async function listenBacnetEvents(ipc: NodeIpc, data: IBacnetRequest, socket: ne
 	ipc.server.emit(socket, `${RESPONSE_EVENT_NAME}_${id}`, result);
 	console.log(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
 
-	if (result.data.isReset) {
-		console.log(`[INFO] - Bacnet client reseted`);
-		// sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
-	}
+	// if (result.data.isReset) {
+	// 	console.log(`[INFO] - Bacnet client reseted`);
+	// 	// sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
+	// }
 }
 
 async function listenBacnetCovEvents(ipc: NodeIpc, data: EventPayload, socket: net.Socket): Promise<void> {
