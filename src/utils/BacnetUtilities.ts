@@ -34,6 +34,7 @@ import { isValidValue, isValidValueArray } from "./functions";
 class BacnetUtilitiesClass extends EventEmitter {
 	private static instance: BacnetUtilitiesClass;
 	private _client: bacnet = null;
+	private _isResettingClient = false;
 
 	private constructor() {
 		super();
@@ -44,8 +45,8 @@ class BacnetUtilitiesClass extends EventEmitter {
 		return this.instance;
 	}
 
-	public createNewBacnetClient(): bacnet {
-		const client = new bacnet({ apduTimeout: 1000 });
+	public createNewBacnetClient(timeout: number = 3000): bacnet {
+		const client = new bacnet({ apduTimeout: timeout });
 		this._listenClientErrorEvent(client);
 		return client;
 	}
@@ -62,18 +63,42 @@ class BacnetUtilitiesClass extends EventEmitter {
 			// this._client = null;
 		});
 
-		client.on("timeout", () => {
-			console.log("client timeout");
-			// this._client = null;
+		client.on("timeout", (payload?: any) => {
+			console.log("client timeout", payload || "");
 		});
 
-		client.on("error", () => {
-			console.log("error client");
-			// this._client = null;
+		client.on("error", (err: Error) => {
+			console.log("error client", err?.message || "");
 		});
 	}
 
+	private _isTimeoutError(error: unknown): boolean {
+		if (!error) return false;
+		const message = error instanceof Error ? error.message : String(error);
+		return /err_?timeout|timeout/i.test(message);
+	}
+
+	private _recoverClientIfTimeout(error: unknown): void {
+		if (!this._isTimeoutError(error)) return;
+		if (this._isResettingClient) return;
+
+		this._isResettingClient = true;
+		try {
+			this[CLIENT_RESET_EVENT]();
+		} finally {
+			this._isResettingClient = false;
+		}
+	}
+
 	public [CLIENT_RESET_EVENT]() {
+		if (this._client) {
+			try {
+				this._client.close();
+			} catch (error) {
+				console.log("error while closing bacnet client", error);
+			}
+		}
+
 		this._client = null;
 		this._client = this.createNewBacnetClient();
 		this.emit(CLIENT_RESET_EVENT, this._client);
@@ -94,6 +119,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 
 				client.readPropertyMultiple(address, sadr, requestArray, (err: Error, data: any) => {
 					if (err) {
+						this._recoverClientIfTimeout(err);
 						reject(err);
 						return;
 					}
@@ -114,6 +140,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 		return new Promise((resolve, reject) => {
 			client.readProperty(address, sadr, objectId, propertyId, options, (err: Error, data: any) => {
 				if (err) {
+					this._recoverClientIfTimeout(err);
 					return reject(err);
 				}
 
@@ -122,11 +149,23 @@ class BacnetUtilitiesClass extends EventEmitter {
 		});
 	}
 
+	public async deviceIsAvailable(device: IDevice): Promise<boolean> {
+		try {
+			await this.readProperty(device.address!, device.SADR, { instance: device.deviceId, type: 8 }, PropertyIds.PROP_OBJECT_NAME);
+			return true;
+		} catch (error) {
+			return false;
+		}
+	}
+
 	////////////////////////////////////////////////////////////////
 	////                  GET ALL BACNET OBJECT LIST              //
 	////////////////////////////////////////////////////////////////
 
 	public async _getDeviceObjectList(device: IDevice, SENSOR_TYPES: Array<number>, getListUsingFragment: boolean = false): Promise<IObjectId[]> {
+		const deviceIsAvailable = await this.deviceIsAvailable(device);
+		if (!deviceIsAvailable) throw new Error("Device is not available");
+
 		const objectId = { type: ObjectTypes.OBJECT_DEVICE, instance: device.deviceId };
 		let values;
 		const deviceAddress = device.address;
@@ -194,6 +233,9 @@ class BacnetUtilitiesClass extends EventEmitter {
 	////////////////////////////////////////////////////////////////
 
 	public async _getObjectDetail(device: IDevice, objects: IObjectId[]): Promise<{ [key: string]: string | boolean | number }[]> {
+		const deviceIsAvailable = await this.deviceIsAvailable(device);
+		if (!deviceIsAvailable) throw new Error("Device is not available");
+
 		let objectLists: (IObjectId | IObjectId[])[] = [...objects];
 
 		let objectListDetails: { [key: string]: string | boolean | number }[] = [];
@@ -212,8 +254,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 					const res = await callbackFunc.call(this, device, object);
 					objectListDetails.push(res);
 				} catch (err) {
-					const deviceAvailable = await this.deviceIsAvailable(device);
-					if (deviceAcceptSegmentation && deviceAvailable) {
+					if (deviceAcceptSegmentation && deviceIsAvailable) {
 						const itemsFound = await this._retryGetObjectDetailWithReadProperty(object, device);
 						if (itemsFound.length > 0) objectListDetails.push(itemsFound);
 					}
@@ -224,15 +265,6 @@ class BacnetUtilitiesClass extends EventEmitter {
 		if (deviceAcceptSegmentation) objectListDetails = lodash.flattenDeep(objectListDetails as any[]);
 
 		return objectListDetails;
-	}
-
-	public async deviceIsAvailable(device: IDevice): Promise<boolean> {
-		try {
-			await this.readProperty(device.address!, device.SADR, { instance: device.deviceId, type: 8 }, PropertyIds.PROP_OBJECT_NAME);
-			return true;
-		} catch (error) {
-			return false;
-		}
 	}
 
 	private async _retryGetObjectDetailWithReadProperty(items: IObjectId[], device: IDevice): Promise<any> {
@@ -257,6 +289,9 @@ class BacnetUtilitiesClass extends EventEmitter {
 		try {
 			const deviceAddress = device.address;
 			if (!deviceAddress) throw new Error("Device address is required");
+
+			const deviceIsAvailable = await this.deviceIsAvailable(device);
+			if (!deviceIsAvailable) throw new Error("Device is not available");
 
 			const requestArray: IRequestArray[] = objects.map((el) => ({
 				objectId: JSON.parse(JSON.stringify(el)),
@@ -290,6 +325,12 @@ class BacnetUtilitiesClass extends EventEmitter {
 	}
 
 	public async _getObjectDetailWithReadProperty(device: IDevice, objectId: IObjectId): Promise<any> {
+		const deviceAddress = device.address;
+		if (!deviceAddress) throw new Error("Device address is required");
+		const deviceIsAvailable = await this.deviceIsAvailable(device);
+
+		if (!deviceIsAvailable) throw new Error("Device is not available");
+
 		const properties = [PropertyIds.PROP_OBJECT_NAME, PropertyIds.PROP_PRESENT_VALUE, PropertyIds.PROP_DESCRIPTION, PropertyIds.PROP_OBJECT_TYPE, PropertyIds.PROP_UNITS, PropertyIds.PROP_MAX_PRES_VALUE, PropertyIds.PROP_MIN_PRES_VALUE, PropertyIds.PROP_BIT_TEXT];
 
 		const propertiesLength = properties.length;
@@ -303,8 +344,6 @@ class BacnetUtilitiesClass extends EventEmitter {
 			deviceId: device.deviceId,
 		};
 
-		const deviceAddress = device.address;
-		if (!deviceAddress) throw new Error("Device address is required");
 		let failedCount = 0;
 
 		while (properties.length > 0) {
@@ -444,6 +483,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 
 			client.writeProperty(request.address, sadr, request.objectId, PropertyIds.PROP_PRESENT_VALUE, [{ type: dataType, value: value }], { priority }, (err: Error, value: any) => {
 				if (err) {
+					this._recoverClientIfTimeout(err);
 					reject(err);
 					return;
 				}

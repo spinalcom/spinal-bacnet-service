@@ -5,20 +5,23 @@ import { CLIENT_RESET_EVENT } from "./constants";
 declare class BacnetUtilitiesClass extends EventEmitter {
     private static instance;
     private _client;
+    private _isResettingClient;
     private constructor();
     static getInstance(): BacnetUtilitiesClass;
-    createNewBacnetClient(): bacnet;
+    createNewBacnetClient(timeout?: number): bacnet;
     getClient(): bacnet;
     private _listenClientErrorEvent;
+    private _isTimeoutError;
+    private _recoverClientIfTimeout;
     [CLIENT_RESET_EVENT](): bacnet;
     readPropertyMultiple(address: string, sadr: any, requestArray: IRequestArray | IRequestArray[]): Promise<IReadPropertyMultiple>;
     readProperty(address: string, sadr: any, objectId: IObjectId, propertyId: number | string, clientOptions?: any): Promise<IReadProperty>;
+    deviceIsAvailable(device: IDevice): Promise<boolean>;
     _getDeviceObjectList(device: IDevice, SENSOR_TYPES: Array<number>, getListUsingFragment?: boolean): Promise<IObjectId[]>;
     getItemListByFragment(device: IDevice, objectId: IObjectId): Promise<IObjectId[]>;
     _getObjectDetail(device: IDevice, objects: IObjectId[]): Promise<{
         [key: string]: string | boolean | number;
     }[]>;
-    deviceIsAvailable(device: IDevice): Promise<boolean>;
     private _retryGetObjectDetailWithReadProperty;
     _getObjectDetailWithReadPropertyMultiple(device: IDevice, objects: IObjectId[]): Promise<any[]>;
     _getObjectDetailWithReadProperty(device: IDevice, objectId: IObjectId): Promise<any>;
