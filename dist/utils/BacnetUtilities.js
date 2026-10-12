@@ -87,7 +87,7 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
             this.instance = new BacnetUtilitiesClass();
         return this.instance;
     }
-    createNewBacnetClient(timeout = 3000) {
+    createNewBacnetClient(timeout = 6000) {
         const client = new bacstack_1.default({ apduTimeout: timeout });
         this._listenClientErrorEvent(client);
         return client;
