@@ -76,6 +76,7 @@ const GlobalVariables_2 = require("./GlobalVariables");
 const node_events_1 = require("node:events");
 const constants_1 = require("./constants");
 const functions_1 = require("./functions");
+const debug_logs_1 = require("./debug_logs");
 class BacnetUtilitiesClass extends node_events_1.EventEmitter {
     constructor() {
         super();
@@ -99,14 +100,14 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
     }
     _listenClientErrorEvent(client) {
         client.on("close", () => {
-            console.log("client closed");
+            // printDebugLog("client closed");
             // this._client = null;
         });
         client.on("timeout", (payload) => {
-            console.log("client timeout", payload || "");
+            // printDebugLog("client timeout", payload || "");
         });
         client.on("error", (err) => {
-            console.log("error client", (err === null || err === void 0 ? void 0 : err.message) || "");
+            // printDebugLog("error client", err?.message || "");
         });
     }
     _isTimeoutError(error) {
@@ -134,7 +135,7 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
                 this._client.close();
             }
             catch (error) {
-                console.log("error while closing bacnet client", error);
+                (0, debug_logs_1.printDebugLog)("error while closing bacnet client", error);
             }
         }
         this._client = null;
@@ -381,7 +382,7 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
                 try {
                     const property = properties.shift();
                     if (typeof property !== "undefined") {
-                        // console.log("property not undefined");
+                        // printDebugLog("property not undefined");
                         const formated = yield this._getPropertyValue(deviceAddress, device.SADR, objectId, property);
                         for (let key in formated) {
                             itemInfo[key] = formated[key];
@@ -498,7 +499,7 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
                 const reason = lastError instanceof Error ? lastError.message : "unknown error";
                 throw new Error(`Failed to write property with all possible data types: ${reason}`);
             }
-            console.log("success");
+            (0, debug_logs_1.printDebugLog)("success");
             return data;
         });
     }

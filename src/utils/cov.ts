@@ -4,6 +4,7 @@ import { ICovSubscribeReq, IObjectId } from "../Interfaces";
 import { BACNET_COV_EVENT_NAME, CLIENT_RESET_EVENT, COV_EVENTS_NAMES } from "./constants";
 import { EventEmitter } from "stream";
 import net from "net";
+import { printDebugLog } from "./debug_logs";
 
 export type EventPayload = {
 	error?: { message: string };
@@ -50,7 +51,7 @@ export class SpinalCov extends EventEmitter {
 					break;
 
 				// case COV_EVENTS_NAMES.subscribed:
-				//     console.log("[COV] - Subscribed to", result.key);
+				//     printDebugLog("[COV] - Subscribed to", result.key);
 				//     break;
 
 				// case COV_EVENTS_NAMES.error:
@@ -58,7 +59,7 @@ export class SpinalCov extends EventEmitter {
 				//     break;
 
 				// case COV_EVENTS_NAMES.changed:
-				//     console.log("[COV] - Change detected for", result.key, "with data:", result.data);
+				//     printDebugLog("[COV] - Change detected for", result.key, "with data:", result.data);
 				//     break;
 			}
 		});
@@ -183,7 +184,7 @@ export class SpinalCov extends EventEmitter {
 		const socketsToSend = socket ? [socket] : this.monitoredToSocketMap.get(data.key || "") || [];
 
 		for (const socket of socketsToSend) {
-			console.log(`[COV] - ${data.key} changed - sending event to ${socket["socketId"]}`);
+			printDebugLog(`[COV] - ${data.key} changed - sending event to ${socket["socketId"]}`);
 			this.ipc.server.emit(socket, BACNET_COV_EVENT_NAME, data);
 		}
 	}

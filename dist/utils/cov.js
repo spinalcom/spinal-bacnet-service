@@ -16,6 +16,7 @@ exports.SpinalCov = void 0;
 const BacnetUtilities_1 = __importDefault(require("./BacnetUtilities"));
 const constants_1 = require("./constants");
 const stream_1 = require("stream");
+const debug_logs_1 = require("./debug_logs");
 class SpinalCov extends stream_1.EventEmitter {
     constructor() {
         super();
@@ -44,13 +45,13 @@ class SpinalCov extends stream_1.EventEmitter {
                     yield this._unsubscribeFromList(data.data, socket);
                     break;
                 // case COV_EVENTS_NAMES.subscribed:
-                //     console.log("[COV] - Subscribed to", result.key);
+                //     printDebugLog("[COV] - Subscribed to", result.key);
                 //     break;
                 // case COV_EVENTS_NAMES.error:
                 //     console.error(`[COV] - Failed  due to", "${result.error?.message}"`);
                 //     break;
                 // case COV_EVENTS_NAMES.changed:
-                //     console.log("[COV] - Change detected for", result.key, "with data:", result.data);
+                //     printDebugLog("[COV] - Change detected for", result.key, "with data:", result.data);
                 //     break;
             }
         }));
@@ -174,7 +175,7 @@ class SpinalCov extends stream_1.EventEmitter {
         // eventEmitter.emit("message", data);
         const socketsToSend = socket ? [socket] : this.monitoredToSocketMap.get(data.key || "") || [];
         for (const socket of socketsToSend) {
-            console.log(`[COV] - ${data.key} changed - sending event to ${socket["socketId"]}`);
+            (0, debug_logs_1.printDebugLog)(`[COV] - ${data.key} changed - sending event to ${socket["socketId"]}`);
             this.ipc.server.emit(socket, constants_1.BACNET_COV_EVENT_NAME, data);
         }
     }

@@ -30,6 +30,7 @@ import { SEGMENTATIONS } from "./GlobalVariables";
 import { EventEmitter } from "node:events";
 import { CLIENT_RESET_EVENT } from "./constants";
 import { isValidValue, isValidValueArray } from "./functions";
+import { printDebugLog } from "./debug_logs";
 
 class BacnetUtilitiesClass extends EventEmitter {
 	private static instance: BacnetUtilitiesClass;
@@ -59,16 +60,16 @@ class BacnetUtilitiesClass extends EventEmitter {
 
 	private _listenClientErrorEvent(client: bacnet): void {
 		client.on("close", () => {
-			console.log("client closed");
+			// printDebugLog("client closed");
 			// this._client = null;
 		});
 
 		client.on("timeout", (payload?: any) => {
-			console.log("client timeout", payload || "");
+			// printDebugLog("client timeout", payload || "");
 		});
 
 		client.on("error", (err: Error) => {
-			console.log("error client", err?.message || "");
+			// printDebugLog("error client", err?.message || "");
 		});
 	}
 
@@ -95,7 +96,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 			try {
 				this._client.close();
 			} catch (error) {
-				console.log("error while closing bacnet client", error);
+				printDebugLog("error while closing bacnet client", error);
 			}
 		}
 
@@ -350,7 +351,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 			try {
 				const property = properties.shift();
 				if (typeof property !== "undefined") {
-					// console.log("property not undefined");
+					// printDebugLog("property not undefined");
 					const formated = await this._getPropertyValue(deviceAddress, device.SADR, objectId, property);
 
 					for (let key in formated) {
@@ -468,7 +469,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 			const reason = lastError instanceof Error ? lastError.message : "unknown error";
 			throw new Error(`Failed to write property with all possible data types: ${reason}`);
 		}
-		console.log("success");
+		printDebugLog("success");
 		return data;
 	}
 

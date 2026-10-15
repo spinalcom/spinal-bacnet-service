@@ -20,6 +20,7 @@ const node_ipc_1 = __importDefault(require("node-ipc"));
 const constants_1 = require("./constants");
 const BacnetUtilities_1 = __importDefault(require("./BacnetUtilities"));
 const cov_1 = require("./cov");
+const debug_logs_1 = require("./debug_logs");
 const { exec } = require("child_process");
 function convertToNumber(value) {
     const numberValue = Number(value);
@@ -36,7 +37,7 @@ function launchBacnetService() {
             if (isAlreadyRunning) {
                 const err = new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
                 return reject(err);
-                // console.log(`Bacnet service is already running on port ${port}.`);
+                // printDebugLog(`Bacnet service is already running on port ${port}.`);
                 // return false;
             }
             node_ipc_1.default.config.id = serviceName;
@@ -56,13 +57,13 @@ function launchBacnetService() {
 function listenBacnetEvents(ipc, data, socket) {
     return __awaiter(this, void 0, void 0, function* () {
         const socketId = data._clientId || `${socket.remoteAddress}:${socket.remotePort}`;
-        console.log(`[RECEIVED] - Received "${data.name}" Bacnet request from ${socketId}`);
+        (0, debug_logs_1.printDebugLog)(`[RECEIVED] - Received "${data.name}" Bacnet request from ${socketId}`);
         const { id } = data;
         const result = yield handleBacnetRequest(data);
         ipc.server.emit(socket, `${constants_1.RESPONSE_EVENT_NAME}_${id}`, result);
-        console.log(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
+        (0, debug_logs_1.printDebugLog)(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
         // if (result.data.isReset) {
-        // 	console.log(`[INFO] - Bacnet client reseted`);
+        // 	printDebugLog(`[INFO] - Bacnet client reseted`);
         // 	// sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
         // }
     });
@@ -70,7 +71,7 @@ function listenBacnetEvents(ipc, data, socket) {
 function listenBacnetCovEvents(ipc, data, socket) {
     return __awaiter(this, void 0, void 0, function* () {
         const socketId = data._clientId || `${socket.remoteAddress}:${socket.remotePort}`;
-        console.log(`[RECEIVED] - Received COV event from ${socketId}`);
+        (0, debug_logs_1.printDebugLog)(`[RECEIVED] - Received COV event from ${socketId}`);
         socket["socketId"] = socketId; // Attach the socketId to the socket for later reference
         cov_1.SpinalCov.getInstance().emit("message", { data, ipc, socket });
     });

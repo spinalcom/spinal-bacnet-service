@@ -5,6 +5,7 @@ import { IBacnetRequest, IBacnetResponse } from "../Interfaces/IBacnetRequest";
 import BacnetUtilities from "./BacnetUtilities";
 import { EventPayload, SpinalCov } from "./cov";
 import { IValidValue } from "../Interfaces/IValidValue";
+import { printDebugLog } from "./debug_logs";
 const { exec } = require("child_process");
 
 function convertToNumber(value: any): number {
@@ -25,7 +26,7 @@ export async function launchBacnetService(port = DEFAULT_PORT, serviceName: stri
 		if (isAlreadyRunning) {
 			const err = new Error(`A Bacnet service is already running on port ${port}. use a different port, or connect your client to the existing service.`);
 			return reject(err);
-			// console.log(`Bacnet service is already running on port ${port}.`);
+			// printDebugLog(`Bacnet service is already running on port ${port}.`);
 			// return false;
 		}
 
@@ -47,21 +48,21 @@ export async function launchBacnetService(port = DEFAULT_PORT, serviceName: stri
 
 async function listenBacnetEvents(ipc: NodeIpc, data: IBacnetRequest, socket: net.Socket): Promise<void> {
 	const socketId = data._clientId || `${socket.remoteAddress}:${socket.remotePort}`;
-	console.log(`[RECEIVED] - Received "${data.name}" Bacnet request from ${socketId}`);
+	printDebugLog(`[RECEIVED] - Received "${data.name}" Bacnet request from ${socketId}`);
 	const { id } = data;
 	const result = await handleBacnetRequest(data);
 	ipc.server.emit(socket, `${RESPONSE_EVENT_NAME}_${id}`, result);
-	console.log(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
+	printDebugLog(`[SENT] - Sent response for "${data.name}" Bacnet request to ${socketId} with status ${result.status}`);
 
 	// if (result.data.isReset) {
-	// 	console.log(`[INFO] - Bacnet client reseted`);
+	// 	printDebugLog(`[INFO] - Bacnet client reseted`);
 	// 	// sendBroadcast(ipc, "bacnet_client_reseted", { message: "Bacnet client has been reset" });
 	// }
 }
 
 async function listenBacnetCovEvents(ipc: NodeIpc, data: EventPayload, socket: net.Socket): Promise<void> {
 	const socketId = data._clientId || `${socket.remoteAddress}:${socket.remotePort}`;
-	console.log(`[RECEIVED] - Received COV event from ${socketId}`);
+	printDebugLog(`[RECEIVED] - Received COV event from ${socketId}`);
 	socket["socketId"] = socketId; // Attach the socketId to the socket for later reference
 
 	SpinalCov.getInstance().emit("message", { data, ipc, socket });
