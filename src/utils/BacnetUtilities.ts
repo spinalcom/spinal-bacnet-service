@@ -175,7 +175,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 		try {
 			if (getListUsingFragment) throw new Error("reason:4"); // Force to use fragment method;
 
-			const deviceAcceptSegmentation = [SEGMENTATIONS.SEGMENTATION_BOTH, SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) != -1;
+			const deviceAcceptSegmentation = await this.deviceAcceptSegmentation(device);
 
 			if (deviceAcceptSegmentation) {
 				const params = [{ objectId: objectId, properties: [{ id: PropertyIds.PROP_OBJECT_LIST }] }];
@@ -240,7 +240,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 		let objectLists: (IObjectId | IObjectId[])[] = [...objects];
 
 		let objectListDetails: { [key: string]: string | boolean | number }[] = [];
-		const deviceAcceptSegmentation = [SEGMENTATIONS.SEGMENTATION_BOTH, SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) !== -1;
+		const deviceAcceptSegmentation = await this.deviceAcceptSegmentation(device);
 
 		const callbackFunc = deviceAcceptSegmentation ? this._getObjectDetailWithReadPropertyMultiple : this._getObjectDetailWithReadProperty;
 
@@ -369,8 +369,29 @@ class BacnetUtilitiesClass extends EventEmitter {
 		return itemInfo;
 	}
 
+	private async deviceAcceptSegmentation(device: IDevice): Promise<boolean> {
+		try {
+			if (!isNaN(device.segmentation as number)) {
+				return [SEGMENTATIONS.SEGMENTATION_BOTH, SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) !== -1;
+			}
+
+			const objectId = { type: ObjectTypes.OBJECT_DEVICE, instance: device.deviceId };
+			const propertyId = PropertyIds.PROP_SEGMENTATION_SUPPORTED;
+			const formated: any = await this._getPropertyValue(device.address as string, device.SADR, objectId, propertyId);
+			const propertyName = this._getPropertyNameByCode(propertyId);
+			if (formated && propertyName) {
+				const value = formated[propertyName];
+				return [SEGMENTATIONS.SEGMENTATION_BOTH, SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(value) !== -1;
+			}
+
+			return false;
+		} catch (error) {
+			return false;
+		}
+	}
+
 	public async _getChildrenNewValue(device: IDevice, children: Array<IObjectId>): Promise<Array<{ id: string | number; type: string | number; currentValue: any }> | undefined> {
-		const deviceAcceptSegmentation = [SEGMENTATIONS.SEGMENTATION_BOTH, SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) !== -1;
+		const deviceAcceptSegmentation = await this.deviceAcceptSegmentation(device);
 
 		if (deviceAcceptSegmentation) return this.getChildrenNewValueWithReadPropertyMultiple(device, children);
 

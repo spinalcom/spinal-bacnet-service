@@ -25,6 +25,7 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     private _retryGetObjectDetailWithReadProperty;
     _getObjectDetailWithReadPropertyMultiple(device: IDevice, objects: IObjectId[]): Promise<any[]>;
     _getObjectDetailWithReadProperty(device: IDevice, objectId: IObjectId): Promise<any>;
+    private deviceAcceptSegmentation;
     _getChildrenNewValue(device: IDevice, children: Array<IObjectId>): Promise<Array<{
         id: string | number;
         type: string | number;

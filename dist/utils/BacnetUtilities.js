@@ -212,7 +212,7 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
             try {
                 if (getListUsingFragment)
                     throw new Error("reason:4"); // Force to use fragment method;
-                const deviceAcceptSegmentation = [GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_BOTH, GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) != -1;
+                const deviceAcceptSegmentation = yield this.deviceAcceptSegmentation(device);
                 if (deviceAcceptSegmentation) {
                     const params = [{ objectId: objectId, properties: [{ id: GlobalVariables_1.PropertyIds.PROP_OBJECT_LIST }] }];
                     let data = yield this.readPropertyMultiple(deviceAddress, device.SADR, params);
@@ -278,7 +278,7 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
                 throw new Error("Device is not available");
             let objectLists = [...objects];
             let objectListDetails = [];
-            const deviceAcceptSegmentation = [GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_BOTH, GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) !== -1;
+            const deviceAcceptSegmentation = yield this.deviceAcceptSegmentation(device);
             const callbackFunc = deviceAcceptSegmentation ? this._getObjectDetailWithReadPropertyMultiple : this._getObjectDetailWithReadProperty;
             if (deviceAcceptSegmentation) {
                 objectLists = lodash.chunk(objects, 10);
@@ -399,9 +399,30 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
             return itemInfo;
         });
     }
+    deviceAcceptSegmentation(device) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                if (!isNaN(device.segmentation)) {
+                    return [GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_BOTH, GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) !== -1;
+                }
+                const objectId = { type: GlobalVariables_1.ObjectTypes.OBJECT_DEVICE, instance: device.deviceId };
+                const propertyId = GlobalVariables_1.PropertyIds.PROP_SEGMENTATION_SUPPORTED;
+                const formated = yield this._getPropertyValue(device.address, device.SADR, objectId, propertyId);
+                const propertyName = this._getPropertyNameByCode(propertyId);
+                if (formated && propertyName) {
+                    const value = formated[propertyName];
+                    return [GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_BOTH, GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(value) !== -1;
+                }
+                return false;
+            }
+            catch (error) {
+                return false;
+            }
+        });
+    }
     _getChildrenNewValue(device, children) {
         return __awaiter(this, void 0, void 0, function* () {
-            const deviceAcceptSegmentation = [GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_BOTH, GlobalVariables_2.SEGMENTATIONS.SEGMENTATION_TRANSMIT].indexOf(device.segmentation) !== -1;
+            const deviceAcceptSegmentation = yield this.deviceAcceptSegmentation(device);
             if (deviceAcceptSegmentation)
                 return this.getChildrenNewValueWithReadPropertyMultiple(device, children);
             return this.getChildrenNewValueWithReadProperty(device, children);
