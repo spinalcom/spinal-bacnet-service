@@ -46,7 +46,7 @@ class BacnetUtilitiesClass extends EventEmitter {
 		return this.instance;
 	}
 
-	public createNewBacnetClient(timeout: number = 6000): bacnet {
+	public createNewBacnetClient(timeout: number = 3000): bacnet {
 		const client = new bacnet({ apduTimeout: timeout });
 		this._listenClientErrorEvent(client);
 		return client;
@@ -172,10 +172,10 @@ class BacnetUtilitiesClass extends EventEmitter {
 		const deviceAddress = device.address;
 		if (!deviceAddress) throw new Error("Device address is required");
 
+		const deviceAcceptSegmentation = await this.deviceAcceptSegmentation(device);
+
 		try {
 			if (getListUsingFragment) throw new Error("reason:4"); // Force to use fragment method;
-
-			const deviceAcceptSegmentation = await this.deviceAcceptSegmentation(device);
 
 			if (deviceAcceptSegmentation) {
 				const params = [{ objectId: objectId, properties: [{ id: PropertyIds.PROP_OBJECT_LIST }] }];
@@ -188,8 +188,14 @@ class BacnetUtilitiesClass extends EventEmitter {
 			}
 		} catch (error: any) {
 			// error reason:4 means that the device does not support segmentation or the response is too big, so we can retry with fragment method
-			if (error?.message?.match(/reason:4/i) || error?.message?.match(/err_timeout/i)) values = await this.getItemListByFragment(device, objectId);
-			else throw error;
+			if (error?.message?.match(/reason:4/i) || error?.message?.match(/err_timeout/i)) {
+				values = await this.getItemListByFragment(device, objectId);
+			} else if (deviceAcceptSegmentation) {
+				let data = await this.readProperty(deviceAddress, device.SADR, objectId, PropertyIds.PROP_OBJECT_LIST);
+				values = data.values;
+			} else {
+				throw error;
+			}
 		}
 
 		// If values is still undefined or empty after trying both methods, throw an error
@@ -428,6 +434,10 @@ class BacnetUtilitiesClass extends EventEmitter {
 
 			return lodash.flattenDeep(res);
 		} catch (error) {
+			const deviceIdAvailable = await this.deviceIsAvailable(device);
+			if (deviceIdAvailable) {
+				return this.getChildrenNewValueWithReadProperty(device, children);
+			}
 			throw error;
 		}
 	}

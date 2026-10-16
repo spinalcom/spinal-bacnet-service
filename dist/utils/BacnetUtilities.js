@@ -209,10 +209,10 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
             const deviceAddress = device.address;
             if (!deviceAddress)
                 throw new Error("Device address is required");
+            const deviceAcceptSegmentation = yield this.deviceAcceptSegmentation(device);
             try {
                 if (getListUsingFragment)
                     throw new Error("reason:4"); // Force to use fragment method;
-                const deviceAcceptSegmentation = yield this.deviceAcceptSegmentation(device);
                 if (deviceAcceptSegmentation) {
                     const params = [{ objectId: objectId, properties: [{ id: GlobalVariables_1.PropertyIds.PROP_OBJECT_LIST }] }];
                     let data = yield this.readPropertyMultiple(deviceAddress, device.SADR, params);
@@ -226,10 +226,16 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
             }
             catch (error) {
                 // error reason:4 means that the device does not support segmentation or the response is too big, so we can retry with fragment method
-                if (((_a = error === null || error === void 0 ? void 0 : error.message) === null || _a === void 0 ? void 0 : _a.match(/reason:4/i)) || ((_b = error === null || error === void 0 ? void 0 : error.message) === null || _b === void 0 ? void 0 : _b.match(/err_timeout/i)))
+                if (((_a = error === null || error === void 0 ? void 0 : error.message) === null || _a === void 0 ? void 0 : _a.match(/reason:4/i)) || ((_b = error === null || error === void 0 ? void 0 : error.message) === null || _b === void 0 ? void 0 : _b.match(/err_timeout/i))) {
                     values = yield this.getItemListByFragment(device, objectId);
-                else
+                }
+                else if (deviceAcceptSegmentation) {
+                    let data = yield this.readProperty(deviceAddress, device.SADR, objectId, GlobalVariables_1.PropertyIds.PROP_OBJECT_LIST);
+                    values = data.values;
+                }
+                else {
                     throw error;
+                }
             }
             // If values is still undefined or empty after trying both methods, throw an error
             if (typeof values === "undefined" || !(values === null || values === void 0 ? void 0 : values.length))
@@ -455,6 +461,10 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
                 return lodash.flattenDeep(res);
             }
             catch (error) {
+                const deviceIdAvailable = yield this.deviceIsAvailable(device);
+                if (deviceIdAvailable) {
+                    return this.getChildrenNewValueWithReadProperty(device, children);
+                }
                 throw error;
             }
         });
