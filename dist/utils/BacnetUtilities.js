@@ -218,12 +218,21 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
         return Array.isArray(options === null || options === void 0 ? void 0 : options.ips) ? options.ips : [];
     }
     _getUnicastTargets(targets) {
-        return targets.filter((target) => target.process === "unicast").map((target) => ({ address: target.address, deviceId: target.deviceId }));
+        return targets.filter((target) => { var _a; return (!target.process || target.process === "unicast") && ((_a = target.address) === null || _a === void 0 ? void 0 : _a.trim()); }).map((target) => ({ address: target.address, deviceId: target.deviceId }));
     }
     _runTargetedDiscovery(client, targets, fail) {
-        this._debug("discoverDevices", "Launching targeted discovery", { targets: targets.length });
+        var _a;
+        this._debug("discoverDevices", "Launching targeted discovery", {
+            targets: targets.length,
+            unicastTargets: targets.filter((target) => { var _a; return (!target.process || target.process === "unicast") && ((_a = target.address) === null || _a === void 0 ? void 0 : _a.trim()); }).length,
+            bbmdTargets: targets.filter((target) => { var _a; return target.process === "bbmd" && ((_a = target.address) === null || _a === void 0 ? void 0 : _a.trim()); }).length,
+        });
         for (const target of targets) {
-            if (target.process === "unicast") {
+            if (!((_a = target.address) === null || _a === void 0 ? void 0 : _a.trim())) {
+                this._debug("discoverDevices", "Skipping target with empty address", { id: target.id, process: target.process });
+                continue;
+            }
+            if (!target.process || target.process === "unicast") {
                 this._debug("discoverDevices", "Sending unicast whoIs", target.address);
                 client.whoIs({ address: target.address });
                 continue;
@@ -326,20 +335,13 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
     }
     _discoverDeviceByReadProperty(client, target) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c;
             this._debug("_discoverDeviceByReadProperty", "Start fallback discovery", target);
             const preferredDeviceId = this._toValidDeviceId(target.deviceId);
-            let resolvedDeviceId = preferredDeviceId;
-            if (typeof resolvedDeviceId === "undefined") {
-                const objectIdentifier = yield this._readPropertyWithClient(client, target.address, { type: GlobalVariables_1.ObjectTypes.OBJECT_DEVICE, instance: GlobalVariables_1.PropertyIds.MAX_BACNET_PROPERTY_ID }, GlobalVariables_1.PropertyIds.PROP_OBJECT_IDENTIFIER);
-                const discoveredDeviceId = (_c = (_b = (_a = objectIdentifier === null || objectIdentifier === void 0 ? void 0 : objectIdentifier.values) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.value) === null || _c === void 0 ? void 0 : _c.instance;
-                resolvedDeviceId = this._toValidDeviceId(discoveredDeviceId);
-                this._debug("_discoverDeviceByReadProperty", "Resolved deviceId from PROP_OBJECT_IDENTIFIER", resolvedDeviceId);
-            }
-            if (typeof resolvedDeviceId === "undefined") {
-                this._debug("_discoverDeviceByReadProperty", "Unable to resolve deviceId from fallback read");
+            if (typeof preferredDeviceId === "undefined") {
+                this._debug("_discoverDeviceByReadProperty", "Fallback requires a known deviceId; provide ips[].deviceId when unicast I-Am is unavailable", { address: target.address });
                 return;
             }
+            const resolvedDeviceId = preferredDeviceId;
             const deviceObjectId = { type: GlobalVariables_1.ObjectTypes.OBJECT_DEVICE, instance: resolvedDeviceId };
             const readOptionalValue = (propertyId) => __awaiter(this, void 0, void 0, function* () {
                 try {
@@ -494,27 +496,42 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
         return this._client;
     }
     discoverDevices(options) {
-        var _a;
         const waitMs = this._DISCOVERY_WAIT_MS;
-        this._debug("discoverDevices", "Discovery requested", { mode: options === null || options === void 0 ? void 0 : options.mode, ips: ((_a = options === null || options === void 0 ? void 0 : options.ips) === null || _a === void 0 ? void 0 : _a.length) || 0 });
+        this._debug("discoverDevices", "Discovery requested", {
+            mode: (options === null || options === void 0 ? void 0 : options.mode) || "broadcast",
+            clientOptions: this._resolveDiscoverClientOptions(options),
+            targets: (options === null || options === void 0 ? void 0 : options.ips) || [],
+        });
         return new Promise((resolve, reject) => {
             const mode = (options === null || options === void 0 ? void 0 : options.mode) || "broadcast";
             const targets = this._getDiscoverTargets(options);
             const unicastTargets = this._getUnicastTargets(targets);
             const clientOptions = this._resolveDiscoverClientOptions(options);
-            const tempClient = new bacstack_1.default(clientOptions);
+            const sharedClientOptions = this._resolveDiscoverClientOptions();
+            const useSharedClient = clientOptions.port === sharedClientOptions.port && clientOptions.interface === sharedClientOptions.interface && clientOptions.broadcastAddress === sharedClientOptions.broadcastAddress;
+            const discoveryClient = useSharedClient ? this.getClient() : new bacstack_1.default(clientOptions);
             const devicesMap = new Map();
             let settled = false;
+            const onIAm = (device) => {
+                const key = this._toDiscoveryMapKey(device.address, device.deviceId, device.SADR);
+                this._debug("discoverDevices", "Received iAm", { address: device.address, deviceId: device.deviceId });
+                devicesMap.set(key, this._mapIAmDevice(device));
+            };
+            const onError = (err) => {
+                this._debug("discoverDevices", "Discovery client error", (err === null || err === void 0 ? void 0 : err.message) || err);
+            };
             // Cleanup and finalize functions for the discovery process
             const cleanup = () => {
-                this._debug("discoverDevices", "Cleanup discovery client listeners and socket");
-                tempClient.removeAllListeners("iAm");
-                tempClient.removeAllListeners("error");
-                try {
-                    tempClient.close();
-                }
-                catch (error) {
-                    this._debug("discoverDevices", "Close error", error);
+                this._debug("discoverDevices", "Cleanup discovery listeners and socket", { sharedClient: useSharedClient });
+                discoveryClient.removeListener("iAm", onIAm);
+                discoveryClient.removeListener("error", onError);
+                if (!useSharedClient) {
+                    try {
+                        discoveryClient.close();
+                    }
+                    catch (error) {
+                        this._debug("discoverDevices", "Close error", error);
+                    }
                 }
             };
             // Finalize the discovery process by cleaning up and resolving the promise with discovered devices
@@ -524,10 +541,10 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
                 settled = true;
                 this._debug("discoverDevices", "Finalize discovery", { devicesFound: devicesMap.size });
                 if (devicesMap.size === 0 && unicastTargets.length > 0) {
-                    yield this._fallbackUnicastDiscoveryWithReadProperty(tempClient, unicastTargets, devicesMap);
+                    yield this._fallbackUnicastDiscoveryWithReadProperty(discoveryClient, unicastTargets, devicesMap);
                 }
                 if (devicesMap.size > 0) {
-                    yield this._filterUnresponsiveDiscoveredDevices(tempClient, devicesMap);
+                    yield this._filterUnresponsiveDiscoveredDevices(discoveryClient, devicesMap);
                 }
                 cleanup();
                 this._debug("discoverDevices", "Discovery finished", { devicesFound: devicesMap.size });
@@ -542,28 +559,22 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
                 cleanup();
                 reject(err);
             };
-            tempClient.on("iAm", (device) => {
-                const key = this._toDiscoveryMapKey(device.address, device.deviceId, device.SADR);
-                this._debug("discoverDevices", "Received iAm", { address: device.address, deviceId: device.deviceId });
-                devicesMap.set(key, this._mapIAmDevice(device));
-            });
-            tempClient.on("error", (err) => {
-                this._debug("discoverDevices", "Discovery client error", (err === null || err === void 0 ? void 0 : err.message) || err);
-            });
+            discoveryClient.on("iAm", onIAm);
+            discoveryClient.on("error", onError);
             setTimeout(() => {
                 this._debug("discoverDevices", "Discovery timeout reached", waitMs);
                 void finalize();
             }, waitMs);
             try {
                 if (targets.length > 0) {
-                    this._runTargetedDiscovery(tempClient, targets, fail);
+                    this._runTargetedDiscovery(discoveryClient, targets, fail);
                     return;
                 }
                 if (mode === "unicast") {
                     fail(new Error("discoverDevices: ips is required in unicast mode"));
                     return;
                 }
-                tempClient.whoIs();
+                discoveryClient.whoIs();
                 this._debug("discoverDevices", "Sending broadcast whoIs");
             }
             catch (error) {
@@ -873,9 +884,7 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
             let errorMessage;
             try {
                 const deviceAcceptSegmentation = yield this.deviceAcceptSegmentation(device);
-                values = deviceAcceptSegmentation
-                    ? yield this.getChildrenNewValueWithReadPropertyMultiple(device, children, tracker)
-                    : yield this.getChildrenNewValueWithReadProperty(device, children, tracker);
+                values = deviceAcceptSegmentation ? yield this.getChildrenNewValueWithReadPropertyMultiple(device, children, tracker) : yield this.getChildrenNewValueWithReadProperty(device, children, tracker);
             }
             catch (error) {
                 errorMessage = error instanceof Error ? error.message : String(error);

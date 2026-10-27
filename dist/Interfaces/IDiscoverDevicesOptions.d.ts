@@ -6,7 +6,7 @@ export interface IDiscoverDevicesOptions {
     apduTimeout?: number;
     ips?: {
         id: number | string;
-        process: "unicast" | "bbmd";
+        process?: "unicast" | "bbmd";
         address: string;
         deviceId?: string | number;
     }[];

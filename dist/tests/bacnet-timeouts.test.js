@@ -111,4 +111,15 @@ const constants_1 = require("../utils/constants");
         BacnetUtilities_1.default.removeListener(constants_1.CLIENT_RESET_EVENT, onReset);
     }
 }));
+(0, node_test_1.default)("discovery treats targets without a process as unicast and skips empty addresses", () => {
+    const whoIs = node_test_1.mock.fn();
+    const fail = node_test_1.mock.fn();
+    BacnetUtilities_1.default._runTargetedDiscovery({ whoIs }, [
+        { id: 50, address: "10.10.121.7", deviceId: 121007 },
+        { id: 69, address: "", deviceId: "" },
+    ], fail);
+    strict_1.default.equal(whoIs.mock.callCount(), 1);
+    strict_1.default.deepEqual(whoIs.mock.calls[0].arguments[0], { address: "10.10.121.7" });
+    strict_1.default.equal(fail.mock.callCount(), 0);
+});
 //# sourceMappingURL=bacnet-timeouts.test.js.map

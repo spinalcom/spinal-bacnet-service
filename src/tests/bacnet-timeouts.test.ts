@@ -65,3 +65,20 @@ test("a failed write does not reset the shared client", async () => {
 		BacnetUtilities.removeListener(CLIENT_RESET_EVENT, onReset);
 	}
 });
+
+test("discovery treats targets without a process as unicast and skips empty addresses", () => {
+	const whoIs = mock.fn();
+	const fail = mock.fn();
+	(BacnetUtilities as any)._runTargetedDiscovery(
+		{ whoIs },
+		[
+			{ id: 50, address: "10.10.121.7", deviceId: 121007 },
+			{ id: 69, address: "", deviceId: "" },
+		],
+		fail,
+	);
+
+	assert.equal(whoIs.mock.callCount(), 1);
+	assert.deepEqual(whoIs.mock.calls[0].arguments[0], { address: "10.10.121.7" });
+	assert.equal(fail.mock.callCount(), 0);
+});

@@ -4,7 +4,7 @@ export interface IDiscoverDevicesOptions {
 	interface?: string;
 	broadcastAddress?: string;
 	apduTimeout?: number;
-	ips?: { id: number | string; process: "unicast" | "bbmd"; address: string; deviceId?: string | number }[];
+	ips?: { id: number | string; process?: "unicast" | "bbmd"; address: string; deviceId?: string | number }[];
 	// bbmdAddress?: string;
 	// bbmdPort?: number;
 	// bbmdTtl?: number;
