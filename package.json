@@ -1,33 +1,33 @@
 {
-  "name": "spinal-bacnet-service",
-  "version": "1.1.1",
-  "description": "",
-  "main": "dist/index.js",
-  "scripts": {
-    "build": "rm -rf dist && tsc",
-    "start": "node dist/index.js",
-    "dev": "npm run build && node index.js",
-    "dev:watch": "nodemon",
-    "test": "npm run build && node --test dist/tests/**/*.test.js",
-    "test:watch": "npm run build && node --test --watch dist/tests/**/*.test.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "bacstack": "file:./lib/bacstack",
-    "dotenv": "^18.0.6",
-    "lodash": "^4.18.1",
-    "node-ipc": "^12.0.0",
-    "typescript": "^6.0.2"
-  },
-  "devDependencies": {
-    "@types/lodash": "^4.17.24",
-    "@types/node": "^25.6.0",
-    "@types/node-ipc": "^9.2.3",
-    "@types/typescript": "^0.4.29",
-    "nodemon": "^3.1.14",
-    "ts-node": "^10.9.2"
-  },
-  "spinalDependencies": {}
+	"name": "spinal-bacnet-service",
+	"version": "1.1.1",
+	"description": "",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "rm -rf dist && tsc",
+		"start": "npm run dev",
+		"dev": "npm run build && node index.js",
+		"dev:watch": "nodemon",
+		"test": "npm run build && node --test dist/tests/**/*.test.js",
+		"test:watch": "npm run build && node --test --watch dist/tests/**/*.test.js"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"bacstack": "file:./lib/bacstack",
+		"dotenv": "^18.0.6",
+		"lodash": "^4.18.1",
+		"node-ipc": "^12.0.0",
+		"typescript": "^6.0.2"
+	},
+	"devDependencies": {
+		"@types/lodash": "^4.17.24",
+		"@types/node": "^25.6.0",
+		"@types/node-ipc": "^9.2.3",
+		"@types/typescript": "^0.4.29",
+		"nodemon": "^3.1.14",
+		"ts-node": "^10.9.2"
+	},
+	"spinalDependencies": {}
 }

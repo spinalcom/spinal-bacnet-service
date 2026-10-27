@@ -11,6 +11,7 @@ export type EventPayload = {
 	key?: string;
 	data?: any;
 	eventName: string;
+	operation?: "subscribe" | "renewal" | "unsubscribe";
 	_clientId?: string;
 	timestamp?: number;
 };
@@ -87,11 +88,11 @@ export class SpinalCov extends EventEmitter {
 
 		return this._sendSubscribeRequestToBacnet(client, data.ip, data.object)
 			.then(() => {
-				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.subscribed }, socket); // Notify the client that subscription was successful
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.subscribed, operation: "subscribe" }, socket); // Notify the client that subscription was successful
 			})
 			.catch((error) => {
 				// If subscription fails, prevent the socket from receiving further events
-				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, error: { message: (error as Error).message } }, socket);
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, operation: "subscribe", error: { message: (error as Error).message } }, socket);
 			});
 	}
 
@@ -111,10 +112,10 @@ export class SpinalCov extends EventEmitter {
 		return this._sendSubscribeRequestToBacnet(client, data.ip, data.object, true)
 			.then(() => {
 				if (!this.monitoredToSocketMap.has(key)) this.monitoredSubscriptions.delete(key);
-				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.unsubscribed }, socket);
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.unsubscribed, operation: "unsubscribe" }, socket);
 			})
 			.catch((error) => {
-				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, error: { message: (error as Error).message } }, socket);
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, operation: "unsubscribe", error: { message: (error as Error).message } }, socket);
 			});
 	}
 
@@ -146,11 +147,12 @@ export class SpinalCov extends EventEmitter {
 		this._listenChangeEvent(client);
 
 		for (const [key, subscription] of subscriptions) {
+			this._sendEvent({ key, eventName: COV_EVENTS_NAMES.renewalStart, operation: "renewal" });
 			try {
 				await this._sendSubscribeRequestToBacnet(client, subscription.ip, subscription.object);
-				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.subscribed });
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.subscribed, operation: "renewal" });
 			} catch (error) {
-				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, error: { message: (error as Error).message } });
+				this._sendEvent({ key, eventName: COV_EVENTS_NAMES.error, operation: "renewal", error: { message: (error as Error).message } });
 			}
 		}
 	}

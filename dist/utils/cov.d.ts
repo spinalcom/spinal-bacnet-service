@@ -7,6 +7,7 @@ export type EventPayload = {
     key?: string;
     data?: any;
     eventName: string;
+    operation?: "subscribe" | "renewal" | "unsubscribe";
     _clientId?: string;
     timestamp?: number;
 };

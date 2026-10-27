@@ -19,6 +19,96 @@ npm install --save bacstack
 
 The API documentation is available under **[fh1ch.github.io/node-bacstack](https://fh1ch.github.io/node-bacstack)**.
 
+### Discovery across networks
+
+IP broadcasts do not normally cross IP routers or VLANs. Choose the path that
+matches your installation; the library cannot infer an unknown BBMD/router or
+configure network equipment for you.
+
+```js
+const Bacnet = require('bacstack');
+const client = new Bacnet({
+  interface: '192.168.1.10',
+  broadcastAddress: '192.168.1.255',
+  apduTimeout: 6000,
+  maxParallelRequests: 4
+});
+client.on('error', console.error);
+client.on('iAm', device => {
+  // address/port identify the IP device or router, not the forwarding BBMD.
+  // SADR identifies the device behind a BACnet router, when present.
+  const receiver = Object.assign({
+    address: device.address,
+    port: device.port
+  }, device.SADR);
+  client.readProperty(receiver, {type: 8, instance: device.deviceId}, 77,
+    (err, result) => {
+      if (err) return console.error(err);
+      console.log(result);
+    });
+});
+
+// Same IP subnet:
+client.whoIs();
+
+// Known BACnet/IP device on another IP subnet (requires IP connectivity):
+client.whoIs({address: '192.168.2.10'});
+
+// BACnet router, e.g. IP to MS/TP: global or specific network discovery.
+client.whoIs({address: '192.168.1.20', dest: {net: 65535}});
+client.whoIs({address: '192.168.1.20', dest: {net: 100}});
+```
+
+For broadcast discovery on a remote BACnet/IP subnet, configure a BBMD there
+to accept Foreign Device Registration. Register before calling `whoIs()`:
+
+```js
+client.registerForeignDevice({address: '192.168.2.1', port: 47808}, 60, err => {
+  if (err) return console.error(err);
+  client.whoIs(); // Distribute-Broadcast-To-Network via the registered BBMD.
+});
+```
+
+Registration is accepted only after a successful BVLC result from the BBMD.
+It renews automatically at 75% of the TTL. Failed initial registration is
+reported to the callback; failed renewal emits `error`. Broadcast discovery
+is blocked after registration fails/expires rather than silently falling back
+to a local broadcast. Call `registerForeignDevice()` again to retry a failed
+registration. `close()` stops renewal; the BBMD entry expires after its TTL.
+Explicit unicast discovery remains available independently of registration.
+
+Existing routed calls with a separate destination remain supported:
+`readProperty(ip, SADR, objectId, propertyId, options, callback)`,
+`readPropertyMultiple(ip, SADR, requests, options, callback)` and
+`writeProperty(ip, SADR, objectId, propertyId, values, options, callback)`.
+An endpoint `{address, port, net, adr}` can also be passed instead of an IP to
+confirmed services; omit `net`/`adr` for direct BACnet/IP devices.
+
+Allow bidirectional UDP traffic (usually port 47808), select the correct
+interface, and use a broadcast-capable network for local discovery. Docker
+bridge networks, VPNs and NAT may require explicit network configuration.
+BBMD and BACnet routing do not bypass firewalls or solve arbitrary NAT setups.
+
+### Parallel requests and timeouts
+
+Confirmed requests are queued FIFO, with **16 active requests per client** by
+default (`maxParallelRequests`, range 1..256). Start with 1-4 for slow devices
+or MS/TP networks. This is a global limit, not a per-device limit. Timeouts
+start when a request is dispatched, not while it waits in the queue.
+
+Active invoke IDs are not reused, and explicit IDs (including zero) must be
+unique among active and queued requests. Conflicts return
+`ERR_INVOKE_ID_IN_USE` to the callback. Segmented responses are assembled
+independently per peer, routed source and transaction; accepted segments
+refresh that transaction's inactivity timeout.
+
+`apduTimeout` is not a discovery timeout: Who-Is is unconfirmed and responses
+arrive as `iAm` events. Increasing it does not fix missing network routes.
+Requests are not automatically retried, particularly to avoid repeating writes.
+`close()` cancels active and queued requests with `ERR_CLIENT_CLOSED`.
+In the enclosing service, an individual request timeout no longer resets the
+shared client; explicit client reset remains available.
+
 ### Features
 
 The BACNET standard defines a wide variety of services as part of it's

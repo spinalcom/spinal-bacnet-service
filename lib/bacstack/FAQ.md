@@ -17,9 +17,11 @@ The error type `ERR_TIMEOUT` is created by Node BACstack itself, if no answer
 has been received from a target device in the defined timeout window. This can
 have a variety of root-causes like issues on the remote device itself (e.g.
 communication disabled), network issues (e.g. wrong network topology), wrong
-communication parameters (e.g. wrong port) or ignored limitations (stack doesn't
-support routing). Some tips regarding debugging such issues are described in
-this document.
+communication parameters (e.g. wrong port), overloaded devices, or missing
+BACnet routing/BBMD configuration. See [Discovery across networks](README.md#discovery-across-networks)
+and [Parallel requests and timeouts](README.md#parallel-requests-and-timeouts)
+for the supported configurations and concurrency limits. Some tips regarding
+debugging such issues are described in this document.
 
 ## I receive the error `BacnetError - Class: X - Code: Y`. What does this mean?
 

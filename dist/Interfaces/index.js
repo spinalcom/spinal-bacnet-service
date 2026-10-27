@@ -17,6 +17,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./IBacnetRequest"), exports);
 __exportStar(require("./ICovObj"), exports);
 __exportStar(require("./IDevice"), exports);
+__exportStar(require("./IDiscoverDevicesOptions"), exports);
 __exportStar(require("./IObjectId"), exports);
 __exportStar(require("./IReadPropertyMultiple"), exports);
 __exportStar(require("./IRequestArray"), exports);
