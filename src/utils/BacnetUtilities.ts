@@ -32,6 +32,7 @@ import { CLIENT_RESET_EVENT } from "./constants";
 import { isValidValue, isValidValueArray } from "./functions";
 import { printDebugLog } from "./debug_logs";
 import { performance } from "node:perf_hooks";
+import { spawn } from "node:child_process";
 
 type BacnetReadErrorCategory = "bacnetError" | "reject" | "abort" | "timeout" | "localError";
 
@@ -47,6 +48,49 @@ interface BacnetReadTracker {
 
 type DiscoverIpTarget = NonNullable<IDiscoverDevicesOptions["ips"]>[number];
 type DiscoverClientOptions = Pick<IDiscoverDevicesOptions, "port" | "interface" | "broadcastAddress" | "apduTimeout">;
+
+interface PingResult {
+	reachable: boolean;
+	responseTimeMs: number | null;
+}
+
+function pingHost(host: string): Promise<PingResult> {
+	return new Promise((resolve, reject) => {
+		const args = process.platform === "win32" ? ["-n", "1", "-w", "2000", host] : process.platform === "darwin" ? ["-n", "-c", "1", "-W", "2000", host] : ["-n", "-c", "1", "-W", "2", host];
+		const child = spawn("ping", args, { stdio: ["ignore", "pipe", "ignore"] });
+		let output = "";
+		let settled = false;
+
+		const timeout = setTimeout(() => {
+			child.kill();
+			if (settled) return;
+			settled = true;
+			resolve({ reachable: false, responseTimeMs: null });
+		}, 3000);
+		timeout.unref();
+
+		child.stdout.setEncoding("utf8");
+		child.stdout.on("data", (chunk: string) => {
+			output += chunk;
+		});
+		child.once("error", (error) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeout);
+			reject(new Error(`Unable to run ICMP ping: ${error.message}`));
+		});
+		child.once("close", (code) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeout);
+			const match = output.match(/time[=<]([\d.]+)\s*ms/i);
+			resolve({
+				reachable: code === 0,
+				responseTimeMs: code === 0 && match ? Number(match[1]) : null,
+			});
+		});
+	});
+}
 
 class BacnetUtilitiesClass extends EventEmitter {
 	private static instance: BacnetUtilitiesClass;
@@ -173,6 +217,21 @@ class BacnetUtilitiesClass extends EventEmitter {
 		if (broadcastAddress) clientOptions.broadcastAddress = broadcastAddress;
 
 		return clientOptions;
+	}
+
+	public async pingDevice(host: string): Promise<PingResult> {
+		const normalizedHost = host?.trim();
+		if (!normalizedHost) throw new Error("A device host is required to run an ICMP ping");
+
+		this._debug("pingDevice", `Pinging device at ${normalizedHost}`);
+		return pingHost(normalizedHost).then((result) => {
+			const { reachable, responseTimeMs } = result;
+
+			const message = reachable ? `Device at ${normalizedHost} is reachable (response time: ${responseTimeMs}ms)` : `Device at ${normalizedHost} is not reachable`;
+			this._debug("pingDevice", message);
+
+			return result;
+		});
 	}
 
 	private _toDiscoveryMapKey(address: string | undefined, deviceId: string | number | undefined, sadr: any): string {

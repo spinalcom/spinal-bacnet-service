@@ -3,6 +3,10 @@ import { IDevice, IDiscoverDevicesOptions, IObjectId, IReadPropertyMultiple, IRe
 import { EventEmitter } from "node:events";
 import { CLIENT_RESET_EVENT } from "./constants";
 type BacnetReadErrorCategory = "bacnetError" | "reject" | "abort" | "timeout" | "localError";
+interface PingResult {
+    reachable: boolean;
+    responseTimeMs: number | null;
+}
 declare class BacnetUtilitiesClass extends EventEmitter {
     private static instance;
     private _client;
@@ -18,6 +22,7 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     private _toValidDeviceId;
     private _configureForeignDeviceRegistration;
     private _resolveDiscoverClientOptions;
+    pingDevice(host: string): Promise<PingResult>;
     private _toDiscoveryMapKey;
     private _mapIAmDevice;
     private _getDiscoverTargets;

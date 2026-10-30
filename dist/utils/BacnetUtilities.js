@@ -78,6 +78,45 @@ const constants_1 = require("./constants");
 const functions_1 = require("./functions");
 const debug_logs_1 = require("./debug_logs");
 const node_perf_hooks_1 = require("node:perf_hooks");
+const node_child_process_1 = require("node:child_process");
+function pingHost(host) {
+    return new Promise((resolve, reject) => {
+        const args = process.platform === "win32" ? ["-n", "1", "-w", "2000", host] : process.platform === "darwin" ? ["-n", "-c", "1", "-W", "2000", host] : ["-n", "-c", "1", "-W", "2", host];
+        const child = (0, node_child_process_1.spawn)("ping", args, { stdio: ["ignore", "pipe", "ignore"] });
+        let output = "";
+        let settled = false;
+        const timeout = setTimeout(() => {
+            child.kill();
+            if (settled)
+                return;
+            settled = true;
+            resolve({ reachable: false, responseTimeMs: null });
+        }, 3000);
+        timeout.unref();
+        child.stdout.setEncoding("utf8");
+        child.stdout.on("data", (chunk) => {
+            output += chunk;
+        });
+        child.once("error", (error) => {
+            if (settled)
+                return;
+            settled = true;
+            clearTimeout(timeout);
+            reject(new Error(`Unable to run ICMP ping: ${error.message}`));
+        });
+        child.once("close", (code) => {
+            if (settled)
+                return;
+            settled = true;
+            clearTimeout(timeout);
+            const match = output.match(/time[=<]([\d.]+)\s*ms/i);
+            resolve({
+                reachable: code === 0,
+                responseTimeMs: code === 0 && match ? Number(match[1]) : null,
+            });
+        });
+    });
+}
 class BacnetUtilitiesClass extends node_events_1.EventEmitter {
     _debug(scope, message, data) {
         if (typeof data === "undefined") {
@@ -200,6 +239,20 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
         if (broadcastAddress)
             clientOptions.broadcastAddress = broadcastAddress;
         return clientOptions;
+    }
+    pingDevice(host) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const normalizedHost = host === null || host === void 0 ? void 0 : host.trim();
+            if (!normalizedHost)
+                throw new Error("A device host is required to run an ICMP ping");
+            this._debug("pingDevice", `Pinging device at ${normalizedHost}`);
+            return pingHost(normalizedHost).then((result) => {
+                const { reachable, responseTimeMs } = result;
+                const message = reachable ? `Device at ${normalizedHost} is reachable (response time: ${responseTimeMs}ms)` : `Device at ${normalizedHost} is not reachable`;
+                this._debug("pingDevice", message);
+                return result;
+            });
+        });
     }
     _toDiscoveryMapKey(address, deviceId, sadr) {
         return `${address || ""}_${deviceId || ""}_${JSON.stringify(sadr || "")}`;
