@@ -11,6 +11,8 @@ declare class BacnetUtilitiesClass extends EventEmitter {
     private static instance;
     private _client;
     private readonly _DISCOVERY_WAIT_MS;
+    private readonly _POINT_READ_CONCURRENCY;
+    private readonly _TIMEOUTS_BEFORE_DEVICE_CHECK;
     private _debug;
     private _getApplicationTagName;
     private _summarizeBacnetValue;

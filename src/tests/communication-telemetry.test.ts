@@ -80,6 +80,45 @@ test("counts property-read fallback as retries and clears recovered timeouts", a
 	}
 });
 
+test("stops scheduling point reads when repeated timeouts confirm device unavailability", async () => {
+	const utilities = BacnetUtilities as any;
+	const originalSegmentationCheck = utilities.deviceAcceptSegmentation;
+	const originalReadProperty = utilities.readProperty;
+	const originalDeviceIsAvailable = utilities.deviceIsAvailable;
+	const children = Array.from({ length: 12 }, (_, index) => ({ type: 0, instance: index + 1 }));
+	let readPropertyCallCount = 0;
+	let availabilityChecks = 0;
+
+	utilities.deviceAcceptSegmentation = async () => false;
+	utilities.readProperty = async () => {
+		readPropertyCallCount++;
+		throw new Error("ERR_TIMEOUT");
+	};
+	utilities.deviceIsAvailable = async () => {
+		availabilityChecks++;
+		return false;
+	};
+
+	try {
+		const result = await BacnetUtilities._getChildrenNewValueWithMetrics(
+			{ address: "192.0.2.1", deviceId: 1, SADR: "" },
+			children,
+		);
+
+		assert.equal(result.values, undefined);
+		assert.equal(result.error, "Failed to get values for all children");
+		assert.equal(availabilityChecks, 1);
+		assert.ok(readPropertyCallCount >= 3);
+		assert.ok(readPropertyCallCount < children.length);
+		assert.equal(result.telemetry.errorsByCategory.timeout, readPropertyCallCount);
+		assert.equal(result.telemetry.errorsByCategory.localError, children.length - readPropertyCallCount);
+	} finally {
+		utilities.deviceAcceptSegmentation = originalSegmentationCheck;
+		utilities.readProperty = originalReadProperty;
+		utilities.deviceIsAvailable = originalDeviceIsAvailable;
+	}
+});
+
 test("publishes explicit renewal lifecycle events for COV telemetry", async () => {
 	const spinalCov = SpinalCov.getInstance() as any;
 	const previousSubscriptions = spinalCov.monitoredSubscriptions;

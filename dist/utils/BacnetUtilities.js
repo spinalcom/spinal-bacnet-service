@@ -516,6 +516,8 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
         super();
         this._client = null;
         this._DISCOVERY_WAIT_MS = 15 * 1000;
+        this._POINT_READ_CONCURRENCY = 8;
+        this._TIMEOUTS_BEFORE_DEVICE_CHECK = 3;
     }
     static getInstance() {
         if (!this.instance)
@@ -1057,42 +1059,82 @@ class BacnetUtilitiesClass extends node_events_1.EventEmitter {
     }
     getChildrenNewValueWithReadProperty(device_1, children_1, tracker_1) {
         return __awaiter(this, arguments, void 0, function* (device, children, tracker, isRetry = false) {
-            var _a;
-            const res = [];
-            try {
-                const deep_children = [...children];
-                let rejectCount = 0;
-                const deviceAddress = this._getRequiredDeviceAddress(device);
-                while (deep_children.length > 0) {
-                    const child = deep_children.shift();
-                    if (child) {
-                        if (isRetry && tracker)
-                            tracker.retries++;
-                        const startedAt = node_perf_hooks_1.performance.now();
-                        try {
-                            child.id = child.instance;
-                            const data = yield this.readProperty(deviceAddress, device.SADR, child, GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE);
-                            const value = (_a = data.values[0]) === null || _a === void 0 ? void 0 : _a.value;
-                            child.currentValue = this._formatCurrentValue(this._getObjValue(value), child.type);
-                            res.push(child);
-                            if (this._isBacnetErrorValue(value))
-                                this._recordReadError(tracker, [child], value);
-                            else
-                                this._recordReadSuccess(tracker, [child], startedAt, !isRetry);
-                        }
-                        catch (error) {
-                            this._recordReadError(tracker, [child], error);
-                            rejectCount++;
+            const successfulReadsByIndex = new Map();
+            const deviceAddress = this._getRequiredDeviceAddress(device);
+            const concurrency = Math.max(1, Math.min(this._POINT_READ_CONCURRENCY, children.length));
+            let nextIndex = 0;
+            let attemptedReads = 0;
+            let rejectCount = 0;
+            let timeoutCount = 0;
+            let stopScheduling = false;
+            let deviceCheckPromise = null;
+            const evaluateDeviceAvailabilityAfterTimeout = () => __awaiter(this, void 0, void 0, function* () {
+                if (stopScheduling || timeoutCount < this._TIMEOUTS_BEFORE_DEVICE_CHECK)
+                    return;
+                if (!deviceCheckPromise) {
+                    deviceCheckPromise = this.deviceIsAvailable(device)
+                        .then((available) => {
+                        this._debug("getChildrenNewValueWithReadProperty", "Timeout threshold reached while reading points", {
+                            address: device.address,
+                            deviceId: device.deviceId,
+                            timeouts: timeoutCount,
+                            deviceAvailable: available,
+                        });
+                        if (!available)
+                            stopScheduling = true;
+                        return available;
+                    })
+                        .finally(() => {
+                        deviceCheckPromise = null;
+                    });
+                }
+                yield deviceCheckPromise;
+            });
+            const runWorker = () => __awaiter(this, void 0, void 0, function* () {
+                var _a;
+                while (!stopScheduling) {
+                    const currentIndex = nextIndex;
+                    nextIndex++;
+                    if (currentIndex >= children.length)
+                        return;
+                    const sourceChild = children[currentIndex];
+                    if (!sourceChild)
+                        continue;
+                    const child = Object.assign({}, sourceChild);
+                    if (isRetry && tracker)
+                        tracker.retries++;
+                    attemptedReads++;
+                    const startedAt = node_perf_hooks_1.performance.now();
+                    try {
+                        child.id = child.instance;
+                        const data = yield this.readProperty(deviceAddress, device.SADR, child, GlobalVariables_1.PropertyIds.PROP_PRESENT_VALUE);
+                        const value = (_a = data.values[0]) === null || _a === void 0 ? void 0 : _a.value;
+                        child.currentValue = this._formatCurrentValue(this._getObjValue(value), child.type);
+                        successfulReadsByIndex.set(currentIndex, child);
+                        if (this._isBacnetErrorValue(value))
+                            this._recordReadError(tracker, [child], value);
+                        else
+                            this._recordReadSuccess(tracker, [child], startedAt, !isRetry);
+                    }
+                    catch (error) {
+                        this._recordReadError(tracker, [child], error);
+                        rejectCount++;
+                        if (this._classifyReadError(error) === "timeout") {
+                            timeoutCount++;
+                            yield evaluateDeviceAvailabilityAfterTimeout();
                         }
                     }
                 }
-                if (rejectCount === children.length)
-                    throw new Error("Failed to get values for all children");
-                return res;
-            }
-            catch (error) {
-                throw error;
-            }
+            });
+            yield Promise.all(Array.from({ length: concurrency }, () => runWorker()));
+            if (deviceCheckPromise)
+                yield deviceCheckPromise;
+            const res = Array.from(successfulReadsByIndex.entries())
+                .sort((first, second) => first[0] - second[0])
+                .map(([, value]) => value);
+            if (attemptedReads === 0 || (rejectCount === attemptedReads && res.length === 0))
+                throw new Error("Failed to get values for all children");
+            return res;
         });
     }
     /////////////////////////////////////////////////////////////////////

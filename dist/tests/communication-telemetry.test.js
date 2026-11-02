@@ -86,6 +86,39 @@ const constants_1 = require("../utils/constants");
         utilities.deviceIsAvailable = originalDeviceIsAvailable;
     }
 }));
+(0, node_test_1.default)("stops scheduling point reads when repeated timeouts confirm device unavailability", () => __awaiter(void 0, void 0, void 0, function* () {
+    const utilities = BacnetUtilities_1.default;
+    const originalSegmentationCheck = utilities.deviceAcceptSegmentation;
+    const originalReadProperty = utilities.readProperty;
+    const originalDeviceIsAvailable = utilities.deviceIsAvailable;
+    const children = Array.from({ length: 12 }, (_, index) => ({ type: 0, instance: index + 1 }));
+    let readPropertyCallCount = 0;
+    let availabilityChecks = 0;
+    utilities.deviceAcceptSegmentation = () => __awaiter(void 0, void 0, void 0, function* () { return false; });
+    utilities.readProperty = () => __awaiter(void 0, void 0, void 0, function* () {
+        readPropertyCallCount++;
+        throw new Error("ERR_TIMEOUT");
+    });
+    utilities.deviceIsAvailable = () => __awaiter(void 0, void 0, void 0, function* () {
+        availabilityChecks++;
+        return false;
+    });
+    try {
+        const result = yield BacnetUtilities_1.default._getChildrenNewValueWithMetrics({ address: "192.0.2.1", deviceId: 1, SADR: "" }, children);
+        strict_1.default.equal(result.values, undefined);
+        strict_1.default.equal(result.error, "Failed to get values for all children");
+        strict_1.default.equal(availabilityChecks, 1);
+        strict_1.default.ok(readPropertyCallCount >= 3);
+        strict_1.default.ok(readPropertyCallCount < children.length);
+        strict_1.default.equal(result.telemetry.errorsByCategory.timeout, readPropertyCallCount);
+        strict_1.default.equal(result.telemetry.errorsByCategory.localError, children.length - readPropertyCallCount);
+    }
+    finally {
+        utilities.deviceAcceptSegmentation = originalSegmentationCheck;
+        utilities.readProperty = originalReadProperty;
+        utilities.deviceIsAvailable = originalDeviceIsAvailable;
+    }
+}));
 (0, node_test_1.default)("publishes explicit renewal lifecycle events for COV telemetry", () => __awaiter(void 0, void 0, void 0, function* () {
     const spinalCov = cov_1.SpinalCov.getInstance();
     const previousSubscriptions = spinalCov.monitoredSubscriptions;
